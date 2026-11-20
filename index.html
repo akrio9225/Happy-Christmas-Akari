@@ -149,7 +149,7 @@
 
   /* ================= Canvas, palette, sprites ================= */
   const cv = $("#fx"), ctx = cv.getContext("2d");
-  let W = 0, H = 0, DPR = 1, GT = 0;
+  let W = 0, H = 0, DPR = 1, GT = 0, GUST = 0;
   const M = 30; // extra margin around the landscape layers so the camera never shows an edge
   const PAL = {
     white: [236, 242, 255], cream: [255, 244, 226], warm: [255, 232, 200], bulb: [255, 214, 160], amber: [255, 186, 110],
@@ -336,7 +336,7 @@
   }
   function startSnowfall() { for (const f of snow) f.y = rand(-H * .75, -8); }
   function drawSnow(dt, amount = 1) {
-    const img = soft(), wind = Math.sin(GT * .13) * 10 + Math.sin(GT * .37) * 5;
+    const img = soft(), wind = Math.sin(GT * .13) * 10 + Math.sin(GT * .37) * 5 + GUST * 70;
     let g = -1;
     for (let i = 0; i < snow.length; i++) {
       const f = snow[i];
@@ -356,7 +356,7 @@
     view(1.6);
     for (let i = crystals.length - 1; i >= 0; i--) {
       const c = crystals[i];
-      c.y += c.vy * dt; c.sw += dt * .6; c.x += Math.sin(c.sw) * 10 * dt; c.rot += c.vr * dt;
+      c.y += c.vy * dt; c.sw += dt * .6; c.x += (Math.sin(c.sw) * 10 + GUST * 40) * dt; c.rot += c.vr * dt;
       if (c.y > H + 60) { crystals.splice(i, 1); continue; }
       if (c.y < -40) continue;
       ctx.globalCompositeOperation = "lighter"; glow("ice", c.x, c.y, c.s * 1.2, .12 * c.a); ctx.globalCompositeOperation = "source-over";
@@ -669,11 +669,11 @@
     for (const r of AUR) {
       for (let x = -M; x < W + M; x += step) {
         const xn = x / W;
-        const by = H * (r.y + .05 * Math.sin(xn * 2.2 + t * .12 * r.sp + r.ph) + .02 * Math.sin(xn * 5.3 - t * .21 * r.sp + r.ph * 2));
+        const by = H * (r.y + .05 * Math.sin(xn * 2.2 + t * .16 * r.sp + r.ph) + .02 * Math.sin(xn * 5.3 - t * .27 * r.sp + r.ph * 2));
         const hh = H * r.h * (.55 + .45 * (.5 + .5 * Math.sin(xn * 3.1 + t * .17 + r.ph)));
         const rays = (.6 + .4 * Math.sin(xn * 46 + t * .9 * r.sp + Math.sin(xn * 9 + t * .3) * 2)) * (.75 + .25 * Math.sin(xn * 130 + t * 1.4));
         const env = .35 + .65 * (.5 + .5 * Math.sin(xn * 4.2 - t * .25 + r.ph * 1.7));
-        ctx.globalAlpha = A * r.a * .58 * rays * env * pulse;
+        ctx.globalAlpha = A * r.a * .62 * rays * env * pulse;
         ctx.drawImage(r.s, 2, 0, 4, 256, x, by - hh, step, hh);
       }
     }
@@ -774,6 +774,19 @@
     g.fillStyle = "#edf2ff"; for (let x = x0 - ov; x <= x1 + ov; x += 2.6) { g.beginPath(); g.arc(x, yw + 1.2, 1.5, 0, TAU); g.fill(); }
     g.fillStyle = "rgba(225,238,255,.85)";
     for (let x = x0 - ov + 2; x < x1 + ov - 2; x += 2.8 + R() * 2.4) { const L = 1.4 + R() * 3.6; g.beginPath(); g.moveTo(x - .7, yw + 3); g.lineTo(x + .7, yw + 3); g.lineTo(x, yw + 3 + L); g.closePath(); g.fill(); }
+    const wrx = mx, wry = yb - dh * .72, wrr = dw * .3; // wreath on the door
+    for (let i = 0; i < 14; i++) { const a = i * TAU / 14; g.fillStyle = i % 2 ? "#2f5e3f" : "#244b33"; g.beginPath(); g.arc(wrx + Math.cos(a) * wrr, wry + Math.sin(a) * wrr, wrr * .4, 0, TAU); g.fill(); }
+    g.fillStyle = "#a3182f"; g.beginPath(); g.arc(wrx, wry + wrr, wrr * .32, 0, TAU); g.fill();
+    for (let r = 0; r < 3; r++) for (let i = 0; i < 4 - r; i++) { // firewood stacked by the wall
+      const lx = x0 + w * .04 + i * w * .055 + r * w * .027, ly = yb - w * .03 - r * w * .05;
+      g.fillStyle = "#5a3a24"; g.beginPath(); g.arc(lx, ly, w * .028, 0, TAU); g.fill();
+      g.fillStyle = "#9b7650"; g.beginPath(); g.arc(lx, ly, w * .015, 0, TAU); g.fill();
+    }
+    g.fillStyle = "#e8eefc"; g.beginPath(); g.ellipse(x0 + w * .12, yb - w * .17, w * .11, w * .02, 0, 0, TAU); g.fill();
+    g.save(); g.translate(x1 - w * .08, yb - 1); g.rotate(-1.25); // a red sled leaning on the wall
+    g.fillStyle = "#8e1b2c"; g.fillRect(0, -w * .045, w * .3, w * .07);
+    g.strokeStyle = "#c9a463"; g.lineWidth = .8; g.beginPath(); g.moveTo(0, w * .04); g.lineTo(w * .3, w * .04); g.quadraticCurveTo(w * .36, w * .04, w * .34, -w * .01); g.stroke();
+    g.restore();
     g.fillStyle = "#c6d1f0"; g.beginPath(); g.ellipse(mx, yb, w * .64, 3, 0, 0, TAU); g.fill();
     return {
       c, cw, ch, ax: mx, ay: yb, w, flare: 0,
@@ -810,6 +823,67 @@
     g.fillStyle = shade(Rb, 1.2); g.beginPath(); g.arc(bx, by - L * .05, L * .16, 0, TAU); g.fill();
     g.fillStyle = "rgba(240,245,255,.75)"; for (let i = 0; i < 7; i++) g.fillRect(x0 + dx * .3 + Math.random() * w * .9, yt - dy * Math.random() * .8, .9, .9);
     return { c, cw, ch, ax: x0 + (w + dx) / 2, ay: yb - dy * .3, bw: w + dx, bh: h + dy };
+  }
+  function cloudSprite(seed) { // thin moonlit cloud
+    const key = "cloud" + seed;
+    if (cache[key]) return cache[key];
+    const w = 512, h = 128, c = mk(w, h), g = c.getContext("2d"), R = mulberry32(seed);
+    for (let i = 0; i < 48; i++) {
+      const x = w * (.1 + R() * .8), y = h * (.42 + (R() - .5) * .4 * (1 - Math.abs(x / w - .5) * 1.5)), rx = w * (.05 + R() * .11), ry = h * (.09 + R() * .13);
+      const gr = g.createRadialGradient(x, y, 0, x, y, rx);
+      gr.addColorStop(0, `rgba(155,170,215,${.09 + R() * .08})`); gr.addColorStop(1, "rgba(155,170,215,0)");
+      g.save(); g.translate(x, y); g.scale(1, ry / rx); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, rx, 0, TAU); g.fill(); g.restore();
+    }
+    g.globalCompositeOperation = "source-atop";
+    const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "rgba(225,232,255,.4)"); gr.addColorStop(.6, "rgba(225,232,255,0)");
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    return (cache[key] = c);
+  }
+  function drawDeer(s, buck, head, ear, tail, alpha) { // standing deer, facing right, feet at y = 13
+    ctx.save(); ctx.scale(s, s); ctx.globalAlpha = alpha;
+    ctx.fillStyle = ctx.strokeStyle = "#0c1024"; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.lineWidth = 1.6; ctx.beginPath();
+    ctx.moveTo(8, 1); ctx.lineTo(8.6, 7); ctx.lineTo(8.2, 13);
+    ctx.moveTo(6, 1.5); ctx.lineTo(5.8, 7.5); ctx.lineTo(6.4, 13);
+    ctx.moveTo(-9, 0); ctx.lineTo(-10.5, 6); ctx.lineTo(-9.4, 13);
+    ctx.moveTo(-11, -.5); ctx.lineTo(-12.2, 6); ctx.lineTo(-11.6, 13);
+    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-14, -2);
+    ctx.bezierCurveTo(-12, -8, 2, -9, 9, -6); ctx.bezierCurveTo(12, -5, 13, -1, 11, 2);
+    ctx.bezierCurveTo(5, 4, -7, 4, -12, 2); ctx.bezierCurveTo(-14.5, 1, -15, -1, -14, -2); ctx.fill();
+    ctx.save(); ctx.translate(-14, -3); ctx.rotate(-.4 + tail * .6); ctx.beginPath(); ctx.ellipse(-1.5, 0, 2.2, 1.1, 0, 0, TAU); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.translate(9, -5); ctx.rotate(head);
+    ctx.beginPath(); ctx.moveTo(-2.5, 1); ctx.lineTo(1.5, -9); ctx.lineTo(5, -10.5); ctx.lineTo(3.5, 1.5); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(1, -10); ctx.bezierCurveTo(4, -12.5, 8, -12, 10.5, -10); ctx.lineTo(10, -8.6); ctx.bezierCurveTo(7.5, -8.3, 5, -8, 3.2, -7.4); ctx.closePath(); ctx.fill();
+    ctx.save(); ctx.translate(2.4, -11.4); ctx.rotate(-.7 + ear * .45); ctx.beginPath(); ctx.ellipse(-2.2, 0, 2.6, 1.1, 0, 0, TAU); ctx.fill(); ctx.restore();
+    if (buck) {
+      ctx.lineWidth = 1; ctx.beginPath();
+      ctx.moveTo(3, -12); ctx.quadraticCurveTo(1.5, -17, -2.5, -19.5); ctx.moveTo(1.6, -15.5); ctx.lineTo(4, -18); ctx.moveTo(.2, -17.8); ctx.lineTo(.6, -21);
+      ctx.moveTo(4.2, -11.8); ctx.quadraticCurveTo(5.5, -16.5, 3.8, -20); ctx.moveTo(5, -15.2); ctx.lineTo(7.4, -17.4);
+      ctx.stroke();
+    }
+    ctx.restore(); ctx.restore();
+  }
+  function snowBall(r, face, buttons) {
+    const key = `sb${Math.round(r * DPR)}${face ? "f" : ""}${buttons ? "b" : ""}`;
+    if (cache[key]) return cache[key];
+    const S = Math.ceil((r * 2 + 6) * DPR), c = mk(S, S), g = c.getContext("2d"); g.scale(DPR, DPR);
+    const m = r + 3;
+    let gr = g.createRadialGradient(m - r * .4, m - r * .45, r * .1, m, m, r * 1.05);
+    gr.addColorStop(0, "#ffffff"); gr.addColorStop(.55, "#e3e9f8"); gr.addColorStop(1, "#8f9ccb");
+    g.fillStyle = gr; g.beginPath(); g.ellipse(m, m, r, r * .96, 0, 0, TAU); g.fill();
+    g.save(); g.clip();
+    gr = g.createLinearGradient(m + r, 0, m + r * .2, 0); gr.addColorStop(0, "rgba(255,190,120,.35)"); gr.addColorStop(1, "rgba(255,190,120,0)");
+    g.fillStyle = gr; g.fillRect(m, 0, r + 3, m * 2);
+    for (let i = 0; i < r * 3; i++) { g.fillStyle = Math.random() < .5 ? "rgba(255,255,255,.5)" : "rgba(120,135,180,.18)"; g.fillRect(m + (Math.random() - .5) * r * 2, m + (Math.random() - .5) * r * 2, .8, .8); }
+    g.restore();
+    g.fillStyle = "#14161f";
+    if (face) {
+      for (const [ex, ey] of [[-.12, -.22], [.34, -.18]]) { g.beginPath(); g.arc(m + ex * r, m + ey * r, r * .095, 0, TAU); g.fill(); }
+      for (let i = 0; i < 5; i++) { const a = 1 + i * .25; g.beginPath(); g.arc(m + Math.cos(a) * r * .48 + r * .1, m + Math.sin(a) * r * .42 + r * .05, r * .05, 0, TAU); g.fill(); }
+    }
+    if (buttons) for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(m + r * .06, m - r * .45 + i * r * .42, r * .09, 0, TAU); g.fill(); }
+    return (cache[key] = { c, size: S / DPR });
   }
   // Antarctic mountains: fractal ridges, snow fields shaded by slope, rocky couloirs and haze
   function mountains(L, baseY, amp, seed, o) {
@@ -855,6 +929,8 @@
   function buildWorld() {
     const R = mulberry32(777), rr = (a, b) => a + R() * (b - a);
     const layer = top => { const h = H - top + M, c = mk((W + 2 * M) * DPR, h * DPR), g = c.getContext("2d"); g.setTransform(DPR, 0, 0, DPR, M * DPR, -top * DPR); return { c, g, top, h }; };
+    const far0 = layer(H * .5);
+    mountains(far0, H * .69, H * .1, 4033, { peaks: 8, rock0: "#273157", rock1: "#1c2447", snowLit: [126, 138, 182], snowDark: [64, 74, 112], streak: "#1e2649", streaks: 24, haze: "48,60,106", hazeA: .85, rim: "rgba(170,255,225,.1)" });
     const far = layer(H * .52);
     mountains(far, H * .715, H * .13, 4101, { peaks: 7, rock0: "#1e284c", rock1: "#141b38", snowLit: [146, 160, 202], snowDark: [52, 64, 104], streak: "#141a34", streaks: 40, haze: "40,52,96", hazeA: .75, rim: "rgba(170,255,225,.14)" });
     const near = layer(H * .6);
@@ -901,6 +977,25 @@
       g.restore();
       g.strokeStyle = "rgba(255,255,255,.7)"; g.lineWidth = 1; g.beginPath(); for (let x = -M; x <= W + M + 4; x += 4) x > -M ? g.lineTo(x, dfy(x)) : g.moveTo(x, dfy(x)); g.stroke();
       for (let i = 0; i < 700; i++) { const x = rr(-M, W + M), y = rr(dfy(x) + 2, H + M); g.fillStyle = R() < .55 ? "rgba(255,255,255,.12)" : "rgba(60,70,120,.1)"; g.fillRect(x, y, 1, 1); }
+      const sc = Math.min(1.3, H / 800);
+      for (const [xn, yn] of [[.03, .94], [.31, .975], [.47, .955], [.57, .99], [.98, .95]]) { // snow-capped rocks
+        const x = xn * W, y = Math.max(dfy(x) + 12, yn * H), r = rr(5, 10) * sc;
+        g.fillStyle = "rgba(70,84,130,.32)"; g.beginPath(); g.ellipse(x + r * .35, y + r * .15, r * 1.8, r * .3, 0, 0, TAU); g.fill();
+        g.fillStyle = "#30364f"; g.beginPath(); g.moveTo(x - r * 1.3, y);
+        for (let k = 1; k < 8; k++) { const a = Math.PI + k / 8 * Math.PI, q = .8 + R() * .35; g.lineTo(x + Math.cos(a) * r * 1.3 * q, y + Math.sin(a) * r * .9 * q); }
+        g.lineTo(x + r * 1.3, y); g.closePath(); g.fill();
+        const sg = g.createRadialGradient(x - r * .2, y - r * .6, 0, x - r * .1, y - r * .5, r * 1.35);
+        sg.addColorStop(0, "rgba(242,246,255,1)"); sg.addColorStop(.72, "rgba(222,231,250,.95)"); sg.addColorStop(1, "rgba(200,212,245,0)");
+        g.fillStyle = sg; g.beginPath(); g.ellipse(x - r * .1, y - r * .5, r * 1.28, r * .55, 0, 0, TAU); g.fill();
+      }
+      g.lineCap = "round";
+      for (let i = 0; i < 24; i++) { // dry grass poking through the snow
+        const x = rr(-M, W + M), y = rr(dfy(x) + 8, H + 4), n = 3 + (R() * 4 | 0), hh = rr(5, 11) * sc;
+        g.strokeStyle = `rgba(${48 + (R() * 30 | 0)},${42 + (R() * 20 | 0)},${46 + (R() * 20 | 0)},.6)`; g.lineWidth = .8;
+        g.beginPath();
+        for (let k = 0; k < n; k++) { const a = rr(-.5, .5), bx = x + k * 1.2 - n * .6; g.moveTo(bx, y); g.quadraticCurveTo(bx + a * hh * .3, y - hh * .6, bx + a * hh, y - hh); }
+        g.stroke();
+      }
     }
     const forest = [];
     for (let i = 0; i < 28; i++) {
@@ -912,16 +1007,28 @@
     forest.sort((a, b) => a.h - b.h);
     const cab = makeCabin(clamp(Math.min(W, H) * .13, 40, 88)); cab.x = cabX; cab.y = fy(cabX) + 5;
     const lanterns = [.3, .62].map((u, i) => { const [x, y] = pathAt(u); return { x: x - 8 - 6 * u, y, h: (14 + 18 * u) * Math.min(1.2, H / 800), ph: i * 2.3, d: u < .5 ? 1 : 1.25 }; });
-    return { far, near, field, front, fy, dfy, forest, cab, lanterns };
+    const pathLights = []; // little lights on stakes along both sides of the footpath
+    for (let u = .07; u < .97; u += .062) for (const side of [-1, 1]) {
+      const [x, y] = pathAt(u), [x2, y2] = pathAt(u + .01), nx = -(y2 - y), ny = x2 - x, nl = Math.hypot(nx, ny) || 1;
+      const k = .5 + 1.8 * clamp((y - P0[1]) / (H - P0[1])), off = (6 + 9 * k) * side, px = x + nx / nl * off, py = y + ny / nl * off;
+      pathLights.push({ x: px, y: py, k, u, ph: R() * TAU, d: py < dfy(px) + 2 ? 1 : 1.25 });
+    }
+    pathLights.sort((a, b) => a.d - b.d || a.y - b.y);
+    const ds = Math.min(1.3, H / 800);
+    const deer = [{ x: W * .05, buck: 1, flip: 1, s: .78 }, { x: W * .115, buck: 0, flip: -1, s: .7 }]
+      .map(d => ({ ...d, y: fy(d.x) + 10 * ds, s: d.s * ds, head: 0, ph: R() * TAU, alert: 0 }));
+    const smX = W * .16, sman = { x: smX, y: dfy(smX) + 28 * ds, h: clamp(Math.min(W, H) * .15, 46, 92) };
+    return { far0, far, near, field, front, fy, dfy, forest, cab, lanterns, pathLights, deer, sman };
   }
   const drawLayer = (L, off) => ctx.drawImage(L.c, -M, L.top + off, W + 2 * M, L.h);
 
   /* ================= The scene ================= */
   const T_FORM = .4, FLY = 2.4, T_TOPSTAR = 2.8, T_REVEAL = 4.4, D_REVEAL = 2.2, T_LIGHT = 6.2, T_BAUBLE = 6.6,
         T_COMET = 8, COMET_D = 2.6, T_STAR = T_COMET + COMET_D,
-        T_SNOW = 11.6, T_FAR = 12.8, T_NEAR = 14, T_FOG = 14.8, T_MOON = 15.6, T_LAKE = 15.8, T_FIELD = 16.2,
-        T_FOREST = 17.2, T_CABIN = 18.4, T_FRONT = 19.4, T_GIFTS = 20.4, T_AUR = 21.4,
-        T_SANTA = 22.6, SANTA_D = 5.6, T_TEXT = 27, INK = 3.2, T_ORN = 30.4, T_DONE = 32.2, T_PULL = 27;
+        T_SNOW = 11.6, T_FAR0 = 12.4, T_FAR = 13.2, T_NEAR = 14.2, T_FOG = 14.8, T_MOON = 15.6, T_LAKE = 15.8, T_FIELD = 16.2,
+        T_CLOUD = 17, T_FOREST = 17.2, T_CABIN = 18.4, T_FRONT = 19.6, T_DEER = 20.2, T_PATHL = 20.6, T_GIFTS = 21, T_SNOWMAN = 22.6,
+        T_AUR = 22.4, T_SANTA = 24, SANTA_D = 5.6, T_TEXT = 28.6, INK = 3.2, T_ORN = 32, T_DONE = 33.8, T_PULL = 28.5;
+  const CLOUDS = [{ seed: 11, x0: .2, y: .45, w: 1.2, h: .09, sp: 6, a: .8 }, { seed: 23, x0: .9, y: .53, w: .9, h: .07, sp: 4.5, a: .65 }, { seed: 37, x0: .5, y: .37, w: 1, h: .08, sp: 8, a: .55 }];
   const GIFTS = [
     { dx: -.62, w: 34, h: 22, d: 12, P: [122, 20, 38], Rb: [232, 207, 150], dy: 0 },
     { dx: -.32, w: 24, h: 31, d: 10, P: [243, 234, 216], Rb: [142, 27, 44], dy: -3 },
@@ -933,7 +1040,7 @@
   const Scene = {
     t: 0, running: false, begun: false, tree: null, world: null, mask: null, P: [], fired: {}, orns: [], glints: [], gifts: [], smoke: [],
     skew: 0, shake: 0, shakeV: 0, starBoost: 0, moonBoost: 0, ring: null, nextGlint: 0, glintT: -9, textRects: null, topY: 0, moonPos: null,
-    sparkleT: 0, wishT: 0, crystT: 0, fly: null, nextFly: 0,
+    sparkleT: 0, wishT: 0, crystT: 0, fly: null, nextFly: 0, smWave: 0, smHat: 0, smHatV: 0, gust: null, nextGust: 0, tgT: 0, cloudX: 0,
     geo() { const apex = H * .405, base = H * .845, th = base - apex; return { cx: W / 2, apex, base, th, mw: Math.min(W * .36, th * .36) }; },
     build() {
       const G = this.geo();
@@ -957,13 +1064,14 @@
       for (const l of this.tree.lights) l.boost = 0;
       for (const o of this.orns) { o.th = rand(-.15, .15); o.w = 0; o.x = o.y = null; }
       for (const g of this.gifts) { g.landed = false; g.hy = g.hv = 0; }
-      this.smoke = []; this.world.cab.flare = 0; crystals = [];
+      this.smoke = []; this.world.cab.flare = 0; crystals = []; this.smWave = this.smHat = this.smHatV = 0; this.gust = null; GUST = 0;
+      for (const d of this.world.deer) { d.head = 0; d.alert = 0; }
     },
     start() {
       if (!this.tree) this.build();
       this.reset();
       this.t = 0; this.running = true; this.fired = {}; this.starBoost = this.moonBoost = 0; this.ring = null; this.textRects = null;
-      this.shake = this.shakeV = 0; this.fly = null; this.nextFly = T_DONE + 16; this.crystT = 9;
+      this.shake = this.shakeV = 0; this.fly = null; this.nextFly = T_DONE + 16; this.crystT = 9; this.nextGust = T_DONE + 7;
       document.body.classList.remove("p-text");
       hideHint();
     },
@@ -998,6 +1106,10 @@
       glow("cream", x, y, r * 4.2 * (1 + .25 * this.moonBoost), (.22 + .25 * this.moonBoost) * km);
       ctx.globalCompositeOperation = "source-over";
       ctx.globalAlpha = 1; ctx.drawImage(Mo.c, x - Mo.size / 2, y - Mo.size / 2, Mo.size, Mo.size);
+      const hg = ctx.createRadialGradient(x, y, r * 3.3, x, y, r * 5.8); // soft icy halo
+      hg.addColorStop(0, "rgba(210,225,255,0)"); hg.addColorStop(.45, `rgba(215,228,255,${.045 * km})`); hg.addColorStop(1, "rgba(210,225,255,0)");
+      ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 1; ctx.fillStyle = hg; ctx.fillRect(x - r * 5.8, y - r * 5.8, r * 11.6, r * 11.6);
+      ctx.globalCompositeOperation = "source-over";
       this.moonPos = [x, y, r];
     },
     drawLake(t, k, aA) {
@@ -1048,7 +1160,7 @@
       const img = soft();
       for (let i = this.smoke.length - 1; i >= 0; i--) {
         const s = this.smoke[i];
-        s.x += s.vx * dt; s.y += s.vy * dt; s.vx += 2.5 * dt; s.s += dt * 3.4; s.life -= dt * .26;
+        s.x += s.vx * dt; s.y += s.vy * dt; s.vx += (2.5 + GUST * 25) * dt; s.s += dt * 3.4; s.life -= dt * .26;
         if (s.life <= 0) { this.smoke.splice(i, 1); continue; }
         ctx.globalAlpha = s.life * .15 * k; ctx.drawImage(img, s.x - s.s, s.y - s.s, s.s * 2, s.s * 2);
       }
@@ -1068,6 +1180,53 @@
         ctx.globalCompositeOperation = "source-over";
       }
     },
+    drawSnowman(t, dt) {
+      const Sm = this.world.sman, t0 = T_SNOWMAN;
+      if (t < t0) return;
+      const h = Sm.h, r1 = h * .2, r2 = h * .15, r3 = h * .11, bx = Sm.x, by = Sm.y;
+      const c1y = by - r1 * .96, c2y = c1y - r1 * .9 - r2 * .78, c3y = c2y - r2 * .85 - r3 * .8;
+      const k0 = ease(clamp((t - t0) / .9)), k1 = clamp((t - t0 - .9) / .45), k2 = clamp((t - t0 - 1.4) / .45);
+      const k3 = easeBack(clamp((t - t0 - 1.9) / .3)), k4 = ease(clamp((t - t0 - 2.1) / .4)), k5 = ease(clamp((t - t0 - 2.4) / .5)), k6 = clamp((t - t0 - 2.8) / .5);
+      const drop = (k, hgt) => k < .75 ? -(1 - Math.pow(k / .75, 2)) * hgt : -Math.sin((k - .75) / .25 * Math.PI) * hgt * .06;
+      ctx.globalAlpha = k0; ctx.drawImage(mound(), bx - r1 * 1.9, by - r1 * .28, r1 * 3.8, r1 * .72);
+      const roll = (1 - k0) * 70, B1 = snowBall(r1, 0, 0);
+      ctx.save(); ctx.translate(bx - roll, c1y); ctx.rotate(-roll / r1); ctx.globalAlpha = Math.min(1, k0 * 2); ctx.drawImage(B1.c, -B1.size / 2, -B1.size / 2, B1.size, B1.size); ctx.restore();
+      if (k1 > 0) { const B2 = snowBall(r2, 0, 1); ctx.globalAlpha = Math.min(1, k1 * 3); ctx.drawImage(B2.c, bx - B2.size / 2, c2y + drop(k1, 70) - B2.size / 2, B2.size, B2.size); }
+      if (k5 > 0) { // stick arms; the right one waves at the tree
+        const fast = this.smWave > 0, wave = Math.sin(t * (fast ? 9 : 2.2)) * (fast ? .5 : .18);
+        ctx.globalAlpha = 1; ctx.strokeStyle = "#3b2618"; ctx.lineCap = "round"; ctx.lineWidth = Math.max(1.2, h * .022);
+        const arm = (sx, sy, ang, len) => {
+          const ex = sx + Math.cos(ang) * len, ey = sy + Math.sin(ang) * len, mx = sx + Math.cos(ang) * len * .65, my = sy + Math.sin(ang) * len * .65;
+          ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey);
+          ctx.moveTo(mx, my); ctx.lineTo(mx + Math.cos(ang - .7) * len * .3, my + Math.sin(ang - .7) * len * .3);
+          ctx.moveTo(ex, ey); ctx.lineTo(ex + Math.cos(ang + .5) * len * .2, ey + Math.sin(ang + .5) * len * .2); ctx.stroke();
+        };
+        arm(bx - r2 * .85, c2y - r2 * .1, Math.PI + .5, h * .32 * k5);
+        arm(bx + r2 * .85, c2y - r2 * .1, -.6 + wave, h * .32 * k5);
+      }
+      if (k2 > 0) { const B3 = snowBall(r3, 1, 0); ctx.globalAlpha = Math.min(1, k2 * 3); ctx.drawImage(B3.c, bx - B3.size / 2, c3y + drop(k2, 80) - B3.size / 2, B3.size, B3.size); }
+      if (k3 > 0) { ctx.globalAlpha = 1; ctx.fillStyle = "#e07a2e"; ctx.beginPath(); ctx.moveTo(bx + r3 * .1, c3y - r3 * .02); ctx.lineTo(bx + r3 * .1 + r3 * .85 * k3, c3y + r3 * .1); ctx.lineTo(bx + r3 * .1, c3y + r3 * .2); ctx.closePath(); ctx.fill(); }
+      if (k4 > 0) { // scarf, fluttering in the wind
+        const fl = Math.sin(t * 3) * .1 + GUST * .5, sy = c3y + r3 * .82;
+        ctx.globalAlpha = k4; ctx.fillStyle = "#8e1b2c";
+        ctx.beginPath(); ctx.ellipse(bx, sy, r3 * 1.02, r3 * .26, 0, 0, TAU); ctx.fill();
+        ctx.save(); ctx.translate(bx - r3 * .55, sy); ctx.rotate(.15 + fl);
+        ctx.fillRect(-r3 * .18, 0, r3 * .36, r3 * 1.1 * k4);
+        ctx.fillStyle = "#c9a463"; ctx.fillRect(-r3 * .18, r3 * .55 * k4, r3 * .36, r3 * .12);
+        ctx.restore();
+      }
+      if (k6 > 0) { // top hat lands with a little bounce
+        const hy = c3y - r3 * .78 + (k6 < .7 ? -(1 - k6 / .7) * 60 : -Math.sin((k6 - .7) / .3 * Math.PI) * 4) + this.smHat;
+        ctx.save(); ctx.translate(bx + r3 * .05, hy); ctx.rotate(-.12); ctx.globalAlpha = Math.min(1, k6 * 3);
+        ctx.fillStyle = "#121318"; ctx.beginPath(); ctx.ellipse(0, 0, r3 * 1.05, r3 * .2, 0, 0, TAU); ctx.fill();
+        ctx.fillRect(-r3 * .62, -r3 * .95, r3 * 1.24, r3 * .95);
+        ctx.fillStyle = "#8e1b2c"; ctx.fillRect(-r3 * .62, -r3 * .32, r3 * 1.24, r3 * .2);
+        ctx.fillStyle = "rgba(230,236,255,.85)"; ctx.beginPath(); ctx.ellipse(-r3 * .1, -r3 * .97, r3 * .5, r3 * .1, 0, 0, TAU); ctx.fill();
+        ctx.restore();
+      }
+      this.smWave = Math.max(0, this.smWave - dt);
+      this.smHatV += 900 * dt; this.smHat += this.smHatV * dt; if (this.smHat > 0) { this.smHat = 0; this.smHatV = 0; }
+    },
     draw(dt, gt) {
       if (!this.tree) return;
       const T = this.tree, Wd = this.world, { cx, apex, base, th, mw } = this.geo(), S = T.S;
@@ -1078,9 +1237,11 @@
         return;
       }
       const t = (this.t += dt), K = (t0, d) => clamp((t - t0) / d);
+      if (t > this.nextGust && !this.gust) { this.gust = { t0: t }; this.nextGust = t + rand(20, 28); whoosh(2.6, .2); this.shakeV += .1; }
+      if (this.gust) { const u = (t - this.gust.t0) / 4; if (u >= 1) { this.gust = null; GUST = 0; } else GUST = Math.sin(u * Math.PI); }
       this.shakeV += (-70 * this.shake - 4.5 * this.shakeV) * dt;
       this.shake += this.shakeV * dt;
-      const skew = clamp((t - T_REVEAL) / 3) * .003 * Math.sin(t * .8) + this.shake;
+      const skew = clamp((t - T_REVEAL) / 3) * .003 * Math.sin(t * .8) + this.shake + GUST * .007;
       this.skew = skew;
       const ox = cx - T.ox, oy = apex - T.oy;
 
@@ -1089,9 +1250,18 @@
       if (km > 0) { view(.18); this.drawMoon(t, km, dt); }
       const aA = ease(K(T_AUR, 4.5));
       if (aA > 0) { view(.14); drawAurora(t, aA); }
+      const kc = ease(K(T_CLOUD, 4));
+      if (kc > 0) { // thin moonlit clouds drifting past the moon
+        view(.2); this.cloudX += dt * (1 + GUST * 3);
+        for (const C of CLOUDS) {
+          const wC = W * C.w, span = W + wC + 2 * M, x = ((C.x0 * W + this.cloudX * C.sp) % span) - wC - M;
+          ctx.globalAlpha = kc * C.a; ctx.drawImage(cloudSprite(C.seed), x, H * C.y - H * C.h / 2, wC, H * C.h);
+        }
+      }
 
       /* far, then near mountains come out of the dark */
-      const kf = ease(K(T_FAR, 2.8)), kn = ease(K(T_NEAR, 2.6));
+      const kf0 = ease(K(T_FAR0, 3)), kf = ease(K(T_FAR, 2.8)), kn = ease(K(T_NEAR, 2.6));
+      if (kf0 > 0) { view(.22); ctx.globalAlpha = kf0; drawLayer(Wd.far0, (1 - kf0) * 24); }
       if (kf > 0) { view(.3); ctx.globalAlpha = kf; drawLayer(Wd.far, (1 - kf) * 30); }
       if (kn > 0) { view(.45); ctx.globalAlpha = kn; drawLayer(Wd.near, (1 - kn) * 36); }
       const kl = ease(K(T_LAKE, 2.2));
@@ -1135,6 +1305,18 @@
         }
       }
       if (t > T_CABIN) { view(.95); this.drawCabin(t, dt); }
+      if (t > T_DEER) { // two deer at the forest edge
+        view(1);
+        const kd = ease(K(T_DEER, 1.6));
+        for (const d of Wd.deer) {
+          d.alert = Math.max(0, d.alert - dt);
+          const graze = d.buck ? Math.sin(t * .21 + d.ph) > .75 : Math.sin(t * .35 + d.ph) > -.2;
+          const target = d.alert > 0 ? -.2 : graze ? 1.2 : .08 * Math.sin(t * .7 + d.ph);
+          d.head += (target - d.head) * Math.min(1, dt * 2.2);
+          const ear = Math.sin(t * 2.3 + d.ph * 3) > .97 ? 1 : 0, tail = Math.sin(t * 1.7 + d.ph) > .92 ? 1 : 0;
+          ctx.save(); ctx.translate(d.x, d.y - 13 * d.s); ctx.scale(d.flip, 1); drawDeer(d.s, d.buck, d.head, ear, tail, kd); ctx.restore();
+        }
+      }
       view(1);
       if (kfield > 0 && km > .3) { // the moon throws the tree's soft shadow toward us
         const sa = .24 * kfield * clamp((km - .3) * 2), gx0 = cx, gy0 = base + 3 + fieldOff;
@@ -1223,6 +1405,14 @@
           ctx.globalCompositeOperation = "source-over";
         }
       }
+      if (t > T_LIGHT + 2) { // snow glinting on the branches
+        this.tgT -= dt;
+        if (this.tgT <= 0) {
+          this.tgT = rand(.12, .32);
+          const tp = T.tips[Math.random() * T.tips.length | 0];
+          sparks.push({ x: cx + tp.x + skew * (base - apex - tp.y), y: apex + tp.y - 1, vx: 0, vy: 0, life: 1, dec: rand(1.6, 2.4), size: rand(3.5, 6.5), c: "cream", g: 0, cross: 1 });
+        }
+      }
       view(1);
       if (kfield > 0) { ctx.globalAlpha = kfield; ctx.drawImage(mound(), cx - mw * .6, base - 11 + fieldOff, mw * 1.2, 26); }
 
@@ -1272,6 +1462,28 @@
         }
         ctx.globalCompositeOperation = "source-over";
       }
+      view(1.25); this.drawSnowman(t, dt);
+      const smP = (dx, dy) => toWorld(...screenOf(this.world.sman.x + dx, this.world.sman.y + dy, 1.25), 1);
+      this.once("sm0", T_SNOWMAN, () => whoosh(.9, .12));
+      this.once("sm1", T_SNOWMAN + 1.25, () => { ping(523, .05); const [px, py] = smP(0, -this.world.sman.h * .45); snowPuff(px, py, 8, .6); });
+      this.once("sm2", T_SNOWMAN + 1.75, () => { ping(659, .05); const [px, py] = smP(0, -this.world.sman.h * .7); snowPuff(px, py, 6, .5); });
+      this.once("sm3", T_SNOWMAN + 1.95, () => ping(784, .04));
+      this.once("sm6", T_SNOWMAN + 3.2, () => chime(.045));
+      if (t > T_PATHL - .2) { // footpath lights switch on from the cabin toward us
+        let curD = -1;
+        for (const L of Wd.pathLights) {
+          const on = clamp((t - T_PATHL - L.u * 1.8) / .3);
+          if (on <= 0) continue;
+          if (L.d !== curD) { curD = L.d; view(L.d); }
+          const s = L.k, tw = .85 + .15 * Math.sin(t * 2 + L.ph);
+          ctx.globalAlpha = .8; ctx.strokeStyle = "#151318"; ctx.lineWidth = .6 * s; ctx.beginPath(); ctx.moveTo(L.x, L.y); ctx.lineTo(L.x, L.y - 3.2 * s); ctx.stroke();
+          ctx.globalCompositeOperation = "lighter";
+          glow("amber", L.x, L.y - 3.5 * s, 7 * s, .18 * on * tw);
+          glow("bulb", L.x, L.y - 3.5 * s, 2.2 * s, .95 * on * tw);
+          ctx.globalCompositeOperation = "source-over";
+        }
+      }
+      this.once("pathl", T_PATHL, () => arpeggio([1319, 1175, 1047, 880, 784], .32, .02));
       this.drawLanterns(t, ease(K(T_CABIN + .5, 1.4)));
 
       /* the first snow — with a few real crystals drifting past the camera */
@@ -1353,7 +1565,7 @@
       }
       this.once("done", T_DONE, () => {
         showHint("tap the star · touch the tree", 7000);
-        setTimeout(() => this.running && showHint("drag to look around · try the gifts, the cabin, the moon ✦", 8000), 9000);
+        setTimeout(() => this.running && showHint("drag to look around · say hi to the snowman ✦", 8000), 9000);
       });
     },
     hitTree(x, y) {
@@ -1400,6 +1612,13 @@
       for (const gf of this.gifts) {
         if (!gf.landed) continue;
         if (Math.abs(x - gf.x) < gf.bw * .6 + 6 && y < gf.y + 8 && y > gf.y - gf.bh - 16) { gf.hv = -260; burst(gf.x, gf.y - gf.bh, 14, "gold"); ping(gf.note); return; }
+      }
+      const Sm = this.world.sman, [smx, smy] = toWorld(sx0, sy0, 1.25);
+      if (t > T_SNOWMAN + 3 && Math.abs(smx - Sm.x) < Sm.h * .32 && smy < Sm.y + 4 && smy > Sm.y - Sm.h * 1.05) {
+        this.smWave = 2.4; this.smHatV = -240; chime(.05); burst(x, y, 12, "gold"); return;
+      }
+      if (t > T_DEER + 1) for (const d of this.world.deer) {
+        if (Math.hypot(x - d.x, y - (d.y - 12 * d.s)) < 22 * d.s + 8) { for (const e of this.world.deer) e.alert = 3.5; ping(1319, .04); return; }
       }
       const C = this.world.cab, [cxw, cyw] = toWorld(sx0, sy0, .95);
       if (t > T_CABIN + 1 && Math.abs(cxw - C.x) < C.w * .7 && cyw > C.y - C.ch + 6 && cyw < C.y + 8) {
@@ -1584,7 +1803,7 @@
   }
   function swell() { if (sfx) { const t = actx.currentTime; pad(65.41, t, 6, .07, sfx); pad(98, t + .6, 6, .05, sfx); } }
   function arpeggio(notes, gap, vol) { if (!sfx) return; const t = actx.currentTime; notes.forEach((f, i) => bell(f, t + i * gap, .4, vol, sfx)); }
-  function whoosh() { if (sfx) noise(actx.currentTime, 1.6, 700, .2); }
+  function whoosh(len = 1.6, vol = .2) { if (sfx) noise(actx.currentTime, len, 700, vol); }
   function jingle(dur, vol = 1) {
     if (!sfx) return;
     const t0 = actx.currentTime;
