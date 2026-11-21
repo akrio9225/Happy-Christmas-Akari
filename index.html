@@ -546,16 +546,17 @@
       gr.addColorStop(0, "rgba(238,244,255,.7)"); gr.addColorStop(1, "rgba(220,232,255,0)");
       g.fillStyle = gr; g.beginPath(); g.ellipse(px, y, rx, ry, 0, 0, TAU); g.fill();
     }
-    // champagne bead garlands, draped in soft swags across the front
+    // champagne bead garlands, draped in soft swags across the front (their own layer, hung after the tree grows)
+    const gar = mk(cw * DPR, ch * DPR), gg = gar.getContext("2d"); gg.setTransform(DPR, 0, 0, DPR, 0, 0);
     for (const [h, sagK] of [[.3, .2], [.47, .22], [.63, .24], [.8, .26]]) {
       const a = env(h) * .86, y0 = yAt(h) + env(h) * .1, segs = a > 60 * S ? 2 : 1;
       for (let s = 0; s < segs; s++) {
         const xa = -a + 2 * a * s / segs, xb = -a + 2 * a * (s + 1) / segs, sag = (xb - xa) * sagK * .5;
         for (let x = xa; x <= xb; x += 2.1 * S + .4) {
           const u = (x - xa) / (xb - xa), y = y0 + sag * (1 - Math.pow(2 * u - 1, 2)) + rr(-.35, .35), r = (.8 + R() * .25) * S;
-          g.fillStyle = "rgba(90,66,30,.9)"; g.beginPath(); g.arc(ox + x + .2, y + .35, r, 0, TAU); g.fill();
-          g.fillStyle = "#e6cf98"; g.beginPath(); g.arc(ox + x, y, r * .85, 0, TAU); g.fill();
-          g.fillStyle = "rgba(255,255,246,.9)"; g.beginPath(); g.arc(ox + x - r * .3, y - r * .3, r * .3, 0, TAU); g.fill();
+          gg.fillStyle = "rgba(90,66,30,.9)"; gg.beginPath(); gg.arc(ox + x + .2, y + .35, r, 0, TAU); gg.fill();
+          gg.fillStyle = "#e6cf98"; gg.beginPath(); gg.arc(ox + x, y, r * .85, 0, TAU); gg.fill();
+          gg.fillStyle = "rgba(255,255,246,.9)"; gg.beginPath(); gg.arc(ox + x - r * .3, y - r * .3, r * .3, 0, TAU); gg.fill();
         }
       }
     }
@@ -602,7 +603,7 @@
       if (R() < .12) { const [px, py] = qp(b, rr(.3, .8)); dust.push({ x: px - ox, y: py - oy }); }
     }
     const tips = B.filter(b => b.sa > .1).map(b => ({ x: b.x1 - ox, y: b.y1 - oy }));
-    return { c, cw, ch, ox, oy, th, mw, HF, S, env, lights, baubles, dust, tips };
+    return { c, gar, cw, ch, ox, oy, th, mw, HF, S, env, lights, baubles, dust, tips };
   }
 
   /* Ornaments */
@@ -1625,11 +1626,16 @@
   }
 
   /* ================= The scene ================= */
-  const T_FORM = .4, FLY = 2.4, T_TOPSTAR = 2.8, T_REVEAL = 4.4, D_REVEAL = 2.2, T_LIGHT = 6.2, T_BAUBLE = 6.6,
-        T_COMET = 8, COMET_D = 2.6, T_STAR = T_COMET + COMET_D,
-        T_SNOW = 11.6, T_FAR0 = 12.4, T_FAR = 13.2, T_NEAR = 14.2, T_FOG = 14.8, T_MOON = 15.6, T_LAKE = 15.8, T_FIELD = 16.2,
-        T_CLOUD = 17, T_FOREST = 17.2, T_CABIN = 18.4, T_FRONT = 19.6, T_DEER = 20.2, T_PATHL = 20.6, T_GIFTS = 21, T_SNOWMAN = 22.6,
-        T_AUR = 22.4, T_SANTA = 24, SANTA_D = 5.6, T_TEXT = 28.6, INK = 3.2, T_ORN = 32, T_DONE = 33.8, T_PULL = 28.5,
+  const T_FORM = .4, FLY = 2.4, T_TOPSTAR = 2.8,
+        // while the tree is still only stars, the land comes out of the dark
+        T_FAR0 = 4.8, T_FAR = 5.6, T_MOON = 6.2, T_NEAR = 6.4, T_FOG = 7, T_LAKE = 7.4, T_FIELD = 8,
+        // then the top star lets one seed fall; it lands, sprouts and grows into the tree
+        T_SEED = 10.8, SEED_D = 1.7, T_LAND = T_SEED + SEED_D, T_SPROUT = T_LAND + .6, SPROUT_D = 1.7,
+        T_GROW = T_SPROUT + SPROUT_D - .3, D_GROW = 6.2, T_TREE = T_GROW + D_GROW,
+        T_BAUBLE = T_TREE + .1, T_COMET = T_TREE + 1.5, COMET_D = 2.6, T_STAR = T_COMET + COMET_D,
+        T_SNOW = T_STAR + 1, T_CLOUD = T_SNOW + 1.2, T_FOREST = T_SNOW + 1.6, T_CABIN = T_SNOW + 2.8, T_FRONT = T_SNOW + 4,
+        T_DEER = T_SNOW + 4.6, T_PATHL = T_SNOW + 5, T_GIFTS = T_SNOW + 5.4, T_AUR = T_SNOW + 6, T_SNOWMAN = T_SNOW + 6.4,
+        T_SANTA = T_SNOW + 7.6, SANTA_D = 5.6, T_TEXT = T_SANTA + 4.6, INK = 3.2, T_ORN = T_TEXT + 3.4, T_DONE = T_TEXT + 5.2, T_PULL = T_TEXT - .1,
         T_SC = T_DONE + 1.2, SC_HI = T_SC + 1.6, SC_GIFT = T_SC + 6.6, SC_GIVE = T_SC + 9, SC_FLY = 1.5, SC_AUTO = T_SC + 34;
   const CLOUDS = [{ seed: 11, x0: .2, y: .45, w: 1.2, h: .09, sp: 6, a: .8 }, { seed: 23, x0: .9, y: .53, w: .9, h: .07, sp: 4.5, a: .65 }, { seed: 37, x0: .5, y: .37, w: 1, h: .08, sp: 8, a: .55 }];
   const GIFTS = [
@@ -1654,7 +1660,6 @@
       const G = this.geo();
       this.tree = buildTree(G.mw, G.th);
       this.world = buildWorld();
-      this.mask = mk(this.tree.c.width, this.tree.c.height);
       const T = this.tree, P = [];
       const add = (kind, tx, ty) => { const p = { kind, tx, ty, sxN: rand(.02, .98), syN: rand(.02, .78), curve: rand(-80, 80), delay: rand(0, 1.4) + ty / G.th * .3, tw: rand(0, TAU), ts: rand(.8, 2.6), cov: -1 }; P.push(p); return p; };
       for (const l of T.lights) l.p = add("light", l.x, l.y);
@@ -1696,18 +1701,51 @@
       const m = 1 - u, b = [m * m * m, 3 * m * m * u, 3 * m * u * u, u * u * u];
       return [b.reduce((s, k, i) => s + k * P[i][0], 0), b.reduce((s, k, i) => s + k * P[i][1], 0)];
     },
-    drawTreeImage(rv, revealY, ox, oy) {
-      const T = this.tree;
-      if (rv >= 1) { ctx.globalAlpha = 1; ctx.drawImage(T.c, ox, oy, T.cw, T.ch); return; }
-      const m = this.mask, mg = m.getContext("2d");
-      mg.setTransform(1, 0, 0, 1, 0, 0); mg.globalCompositeOperation = "source-over";
-      mg.clearRect(0, 0, m.width, m.height); mg.drawImage(T.c, 0, 0);
-      mg.globalCompositeOperation = "destination-in";
-      const ly = (revealY - oy) * DPR, band = 54 * DPR, gr = mg.createLinearGradient(0, ly - band, 0, ly);
-      gr.addColorStop(0, "rgba(0,0,0,0)"); gr.addColorStop(1, "rgba(0,0,0,1)");
-      mg.fillStyle = gr; mg.fillRect(0, 0, m.width, m.height);
-      mg.globalCompositeOperation = "source-over";
-      ctx.globalAlpha = 1; ctx.drawImage(m, ox, oy, T.cw, T.ch);
+    drawSeed(t, sx, sy, cx, base, S) { // the top star lets go of one glowing seed; it lands, cracks open and sprouts
+      if (t < T_SEED || t > T_GROW + .8) return;
+      const y1 = base - 3 * S;
+      let px = cx, py = y1, rot = 0;
+      if (t < T_LAND) {
+        const u = (t - T_SEED) / SEED_D, e = u * u * (.55 + .45 * u);
+        px = sx + (cx - sx) * u + Math.sin(u * Math.PI * 2.2) * 8 * S * (1 - u); py = sy + (y1 - sy) * e; rot = u * 9;
+        if (Math.random() < .85) sparks.push({ x: px, y: py - 3 * S, vx: rand(-12, 12), vy: rand(-30, -6), life: 1, dec: rand(1.1, 1.8), size: rand(2, 4), c: Math.random() < .5 ? "champ" : "cream", g: -4 });
+      }
+      const lu = t - T_LAND, ga = t < T_LAND ? 1 : Math.max(0, 1 - lu / (T_GROW - T_LAND + .4));
+      ctx.globalCompositeOperation = "lighter";
+      glow("cream", px, py, (t < T_LAND ? 26 : 30) * S, .45 * ga); glow("gold", px, py, (9 + (t < T_LAND ? 0 : 2 * Math.sin(t * 6))) * S, .9 * ga);
+      if (lu > 0 && lu < 1.5) { // a ring of light runs out across the snow
+        const r = lu * 80 * S; ctx.globalAlpha = (1 - lu / 1.5) * .55; ctx.strokeStyle = "rgb(255,236,200)"; ctx.lineWidth = 1.3;
+        ctx.beginPath(); ctx.ellipse(cx, y1 + 2 * S, r, r * .2, 0, 0, TAU); ctx.stroke();
+      }
+      ctx.globalCompositeOperation = "source-over";
+      const crack = clamp((t - T_SPROUT) / .5), sa = 1 - clamp((t - T_SPROUT - .6) / .6);
+      if (sa > 0) for (const s of [-1, 1]) { // the two halves of the seed's shell
+        ctx.save(); ctx.translate(px + s * crack * 3.2 * S, py + crack * 1.2 * S); ctx.rotate(rot + s * crack * .7); ctx.globalAlpha = sa;
+        ctx.fillStyle = s < 0 ? "#d8a64c" : "#a8782e";
+        ctx.beginPath(); ctx.ellipse(0, 0, 1.7 * S, 2.8 * S, 0, s < 0 ? Math.PI / 2 : -Math.PI / 2, s < 0 ? Math.PI * 1.5 : Math.PI / 2); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
+      if (t > T_SPROUT) { // a little stem, two seed leaves opening, then a first tuft of needles
+        const su = clamp((t - T_SPROUT) / SPROUT_D), hs = ease(su) * 28 * S, fade = 1 - clamp((t - T_GROW) / .6), sw = Math.sin(t * 2.2) * 1.4 * S * su;
+        if (fade > 0) {
+          const tx = cx + sw, ty = y1 - hs;
+          ctx.globalAlpha = fade; ctx.lineCap = "round"; ctx.strokeStyle = "#6faa4c"; ctx.lineWidth = 1.7 * S;
+          ctx.beginPath(); ctx.moveTo(cx, y1); ctx.quadraticCurveTo(cx - 2.2 * S * su, y1 - hs * .5, tx, ty); ctx.stroke();
+          const lo = ease(clamp((su - .3) / .5));
+          for (const s of [-1, 1]) {
+            ctx.save(); ctx.translate(tx, ty); ctx.rotate(s * (.15 + 1.05 * lo)); ctx.fillStyle = s < 0 ? "#8fcf6a" : "#62a24a";
+            ctx.beginPath(); ctx.ellipse(0, -5.6 * S * lo, 2.6 * S * lo + .2, 5.8 * S * lo + .2, 0, 0, TAU); ctx.fill(); ctx.restore();
+          }
+          const nk = clamp((su - .7) / .3);
+          if (nk > 0) {
+            ctx.strokeStyle = "#2f6b3c"; ctx.lineWidth = .9 * S; ctx.beginPath();
+            for (let i = 0; i < 7; i++) { const a = -Math.PI / 2 + (i - 3) * .32; ctx.moveTo(tx, ty); ctx.lineTo(tx + Math.cos(a) * 5.5 * S * nk, ty + Math.sin(a) * 5.5 * S * nk); }
+            ctx.stroke();
+          }
+          ctx.globalCompositeOperation = "lighter"; glow("lgreen", tx, ty, 10 * S, .25 * fade * su); ctx.globalCompositeOperation = "source-over";
+        }
+      }
+      ctx.globalAlpha = 1;
     },
     drawMoon(t, km, dt) {
       const r = clamp(Math.min(W, H) * .062, 18, 34), x = W * .17, y = H * (.83 - .34 * ease(km)), Mo = moonSprite(r);
@@ -1877,11 +1915,19 @@
         return;
       }
       const t = (this.t += dt), K = (t0, d) => clamp((t - t0) / d);
+      const gu = clamp((t - T_GROW) / D_GROW), ge = t < T_GROW ? 0 : .075 + .925 * easeIO(gu), gsy = ge, gsx = Math.pow(ge, 1.12);
+      const grown = (lx, ly) => { // is a point (relative to the apex) already inside the growing tree?
+        if (ge <= 0) return false;
+        const d = th - ly;
+        if (d > th * gsy + 2) return false;
+        return Math.abs(lx) <= gsx * T.env(clamp((th - d / gsy) / (th * T.HF))) * .95 + 2 * S;
+      };
+      const shim = y => 1 + .9 * Math.pow(Math.max(0, Math.sin(y / th * 5 - t * 2.2)), 12); // a slow shimmer down the star tree
       if (t > this.nextGust && !this.gust) { this.gust = { t0: t }; this.nextGust = t + rand(20, 28); whoosh(2.6, .2); this.shakeV += .1; }
       if (this.gust) { const u = (t - this.gust.t0) / 4; if (u >= 1) { this.gust = null; GUST = 0; } else GUST = Math.sin(u * Math.PI); }
       this.shakeV += (-70 * this.shake - 4.5 * this.shakeV) * dt;
       this.shake += this.shakeV * dt;
-      const skew = clamp((t - T_REVEAL) / 3) * .003 * Math.sin(t * .8) + this.shake + GUST * .007;
+      const skew = clamp((t - T_GROW) / 3) * .003 * Math.sin(t * .8) + this.shake + GUST * .007;
       this.skew = skew;
       const ox = cx - T.ox, oy = apex - T.oy;
 
@@ -1919,7 +1965,7 @@
       }
 
       /* the snowfield rises, then the forest grows tree by tree */
-      const kfield = ease(K(T_FIELD, 2.6)), fieldOff = (1 - kfield) * H * .3, lightsOn = K(T_LIGHT, 1.6);
+      const kfield = ease(K(T_FIELD, 2.6)), fieldOff = (1 - kfield) * H * .3, lightsOn = clamp((ge - .25) / .75);
       if (kfield > 0) {
         view(1); ctx.globalAlpha = 1; drawLayer(Wd.field, fieldOff);
         ctx.globalCompositeOperation = "lighter";
@@ -1970,8 +2016,8 @@
         }
       }
       view(1);
-      if (kfield > 0 && km > .3) { // the moon throws the tree's soft shadow toward us
-        const sa = .24 * kfield * clamp((km - .3) * 2), gx0 = cx, gy0 = base + 3 + fieldOff;
+      if (kfield > 0 && km > .3 && ge > 0) { // the moon throws the tree's soft shadow toward us
+        const sa = .24 * kfield * clamp((km - .3) * 2) * ge, gx0 = cx, gy0 = base + 3 + fieldOff;
         const gr = ctx.createLinearGradient(gx0, gy0, gx0 + mw * 1.2, gy0 + H * .045);
         gr.addColorStop(0, `rgba(8,12,36,${sa})`); gr.addColorStop(1, "rgba(8,12,36,0)");
         ctx.globalAlpha = 1; ctx.fillStyle = gr;
@@ -1985,14 +2031,18 @@
 
       /* ---- the tree (sways in the breeze, shakes when touched) ---- */
       ctx.transform(1, 0, -skew, 1, skew * base, 0);
-      const rv = clamp((t - T_REVEAL) / D_REVEAL), revealY = base + 12 - (th + 50) * easeIO(rv);
-      if (rv > 0) this.drawTreeImage(rv, revealY, ox, oy);
+      if (ge > 0) { // the young fir grows up out of the sprout, anchored at its base
+        ctx.globalAlpha = clamp((t - T_GROW) / .5);
+        ctx.drawImage(T.c, cx - T.ox * gsx, base - (T.oy + th) * gsy, T.cw * gsx, T.ch * gsy);
+        const kg = clamp((t - T_BAUBLE) / 1.4); // the bead garlands are hung once it has grown
+        if (kg > 0) { ctx.globalAlpha = kg; ctx.drawImage(T.gar, ox, oy, T.cw, T.ch); }
+      }
       ctx.globalCompositeOperation = "lighter";
       if (lightsOn > 0) { ctx.globalAlpha = .1 * lightsOn; ctx.drawImage(treeGlow(), cx - mw * .9, apex + th * .18, mw * 1.8, th * .75); }
-      if (rv > 0 && rv < 1) {
-        const hN = clamp((revealY - apex) / (th * T.HF)), hw = T.env(hN) * 1.1 + 6;
-        ctx.globalAlpha = .5; ctx.drawImage(sprite("cream"), cx - hw, revealY - 7, hw * 2, 14);
-        for (let i = 0; i < 3; i++) sparks.push({ x: cx + rand(-1, 1) * hw * .9, y: revealY + rand(-3, 3), vx: rand(-15, 15), vy: rand(-50, -10), life: 1, dec: rand(1.2, 2), size: rand(2.5, 4.5), c: "cream", g: -10 });
+      if (ge > 0 && gu < 1) { // life rising through it, and a soft light at the growing tip
+        const tipY = base - th * gsy, fd = 1 - Math.max(0, (gu - .85) / .15);
+        glow("cream", cx, tipY, (14 + 26 * gsy) * S, .4 * fd); glow("champ", cx, tipY, 6 * S, .7 * fd);
+        if (Math.random() < .6) sparks.push({ x: cx + rand(-1, 1) * gsx * mw * .8, y: base - rand(.05, .9) * th * gsy, vx: rand(-8, 8), vy: rand(-42, -16), life: 1, dec: rand(.9, 1.4), size: rand(2, 3.6), c: Math.random() < .55 ? "champ" : "lgreen", g: -6 });
       }
       const cu = clamp((t - T_COMET) / COMET_D);
       if (cu > 0) {
@@ -2031,21 +2081,21 @@
           glow("white", sx + dx * k2 - dy / len * b2, sy + dy * k2 + dx / len * b2, 1.6, .4);
           continue;
         }
-        if (p.cov === -1 && rv > 0 && ty >= revealY) p.cov = t;
+        if (p.cov === -1 && grown(p.tx, p.ty)) p.cov = t;
         const fade = p.cov === -1 ? 1 : 1 - clamp((t - p.cov) / .6);
-        if (fade > 0) glow("white", tx, ty, 1.8, (.4 + .4 * Math.abs(Math.sin(t * p.ts + p.tw))) * fade);
+        if (fade > 0) glow("white", tx, ty, 1.8, (.4 + .4 * Math.abs(Math.sin(t * p.ts + p.tw))) * fade * shim(p.ty));
       }
       for (const l of T.lights) {
         const p = l.p;
         if (ease(clamp((t - T_FORM - p.delay) / FLY)) < 1) continue;
         const x = cx + l.x, y = apex + l.y;
-        if (p.cov === -1 && rv > 0 && y >= revealY) p.cov = t;
+        if (p.cov === -1 && grown(l.x, l.y)) { p.cov = t; l.boost = .7; }
         const cov = p.cov === -1 ? 0 : clamp((t - p.cov) / .6);
         const vis = l.z > .05 ? 1 : l.z > -.55 ? .1 + (l.z + .55) / .6 * .9 : 0;
         const v = 1 + (vis - 1) * cov;
         if (v <= 0) continue;
-        const on = clamp((t - T_LIGHT - (1 - l.y / th) * 1.3) / .35);
-        if (on < 1) glow("white", x, y, 1.8, (1 - on) * (.45 + .4 * Math.abs(Math.sin(t * p.ts + p.tw))) * v);
+        const on = p.cov === -1 ? 0 : clamp((t - p.cov - .15) / .4);
+        if (on < 1) glow("white", x, y, 1.8, (1 - on) * (.45 + .4 * Math.abs(Math.sin(t * p.ts + p.tw))) * v * shim(l.y));
         if (on > 0) {
           l.boost *= Math.exp(-2.5 * dt);
           const tw = .84 + .16 * Math.sin(t * l.sp * 2.2 + l.ph);
@@ -2070,11 +2120,20 @@
         }
       }
       view(1);
-      if (kfield > 0) { ctx.globalAlpha = kfield; ctx.drawImage(mound(), cx - mw * .6, base - 11 + fieldOff, mw * 1.2, 26); }
+      if (kfield > 0) { const mg = .2 + .8 * ge, mh = .4 + .6 * ge; ctx.globalAlpha = kfield; ctx.drawImage(mound(), cx - mw * .6 * mg, base - 11 * mh + fieldOff, mw * 1.2 * mg, 26 * mh); }
 
       /* the star on top */
       const sx = cx + skew * (base - apex), sy = apex - 2 * S;
-      if (t > T_TOPSTAR && t < T_STAR) { const a = clamp((t - T_TOPSTAR) / .8); drawTopper(sx, sy, S, t, 0, .28 * a * (1 + .2 * Math.sin(t * 5)), 0, 0, a); }
+      if (t > T_TOPSTAR && t < T_STAR) {
+        const a = clamp((t - T_TOPSTAR) / .8), fl = Math.max(0, 1 - Math.abs(t - T_SEED + .1) / .6);
+        drawTopper(sx, sy, S, t, 0, .28 * a * (1 + .2 * Math.sin(t * 5)) + .8 * fl, .35 * fl, fl, a);
+      }
+      this.drawSeed(t, sx, sy, cx, base, S);
+      this.once("seed", T_SEED - .1, () => { if (sfx) { const a = actx.currentTime; [2637, 2349, 2093, 1760, 1568, 1319, 1047].forEach((f, i) => bell(f, a + i * .22, .5, .028, sfx)); noise(a, 1, 5200, .04, "highpass"); } });
+      this.once("land", T_LAND, () => { const y1 = base - 3 * S; snowPuff(cx, y1, 12, .7); burst(cx, y1, 18, "gold"); if (sfx) { const a = actx.currentTime; bell(784, a, 1.4, .07, sfx); bell(1175, a + .05, 1, .03, sfx); pad(130.81, a, 3.5, .05, sfx); } });
+      this.once("sprout", T_SPROUT, () => { arpeggio([523.25, 659.25, 783.99], .16, .03); setTimeout(startMusic, 1200); });
+      this.once("grow", T_GROW, () => growSound());
+      this.once("tree", T_TREE, () => chime(.05));
       this.once("star", T_STAR, () => { this.ring = 0; burst(sx, sy, 46, "gold"); ignite(); this.nextGlint = T_STAR + 3; });
       if (t >= T_STAR) {
         const sk = easeBack(clamp((t - T_STAR) / .9)), spk = ease(clamp((t - T_STAR) / 1.4));
@@ -2438,7 +2497,7 @@
     },
     shakeTree(dir) { this.shakeV += dir * .35; },
     move(sx0, sy0) {
-      if (!this.running || this.t < T_LIGHT) return;
+      if (!this.running || this.t < T_TREE) return;
       const [x, y] = toWorld(sx0, sy0, 1);
       if (this.hitTree(x, y)) this.boostAt(x, y, 44);
     },
@@ -2489,7 +2548,7 @@
         C.flare = 1; for (let i = 0; i < 8; i++) this.smoke.push({ x: C.x + C.chim.x, y: C.y + C.chim.y, vx: rand(-3, 6), vy: rand(-26, -14), s: rand(2, 3.5), life: 1 });
         chime(.05); return;
       }
-      if (t > T_REVEAL + D_REVEAL && this.hitTree(x, y)) { this.shakeTree(x < cx ? 1 : -1); this.boostAt(x, y, 90); this.knockSnow(x, y); burst(x, y, 14, "gold"); chime(); return; }
+      if (t > T_TREE && this.hitTree(x, y)) { this.shakeTree(x < cx ? 1 : -1); this.boostAt(x, y, 90); this.knockSnow(x, y); burst(x, y, 14, "gold"); chime(); return; }
       if (sc && sc.tClose > 0 && sy0 < H * .6) { const [fx, fy] = toWorld(sx0, sy0, FW_D); launchFirework(fx, fy, Math.random() < .15 ? "heart" : null); return; }
       shoot(sx0, sy0); burst(x, y, 10, "gold"); ping(1760);
     }
@@ -2540,7 +2599,7 @@
     let lastShake = 0;
     addEventListener("devicemotion", e => {
       const a = e.accelerationIncludingGravity || e.acceleration; if (!a) return;
-      if (Math.hypot(a.x || 0, a.y || 0, a.z || 0) > 22 && performance.now() - lastShake > 280 && Scene.t > T_REVEAL + D_REVEAL) {
+      if (Math.hypot(a.x || 0, a.y || 0, a.z || 0) > 22 && performance.now() - lastShake > 280 && Scene.t > T_TREE) {
         lastShake = performance.now(); Scene.shakeTree(Math.random() < .5 ? 1 : -1); Scene.knockSnow(W / 2, H);
       }
     });
@@ -2672,9 +2731,12 @@
   function drone() {
     const t = actx.currentTime;
     pad(65.41, t, 9, .05, sfx); pad(98, t + 2, 8, .03, sfx);
-    sweep(t + T_REVEAL, D_REVEAL, 300, 2600, .05);
-    const steps = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3, 2, 9 / 4, 5 / 2, 3, 10 / 3, 4];
-    steps.forEach((m, i) => bell(523.25 * m, t + T_LIGHT - .2 + i * 1.6 / steps.length, .25, .035, sfx));
+  }
+  function growSound() { // a slow rising shimmer while the tree grows
+    if (!sfx) return;
+    const t = actx.currentTime, steps = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3, 2, 9 / 4, 5 / 2, 3, 10 / 3, 4];
+    sweep(t, D_GROW, 200, 2400, .035); pad(98, t, D_GROW, .035, sfx);
+    steps.forEach((m, i) => bell(523.25 * m, t + .3 + i * (D_GROW - .6) / steps.length, .4, .03, sfx));
   }
   function ignite(again) {
     if (!sfx) return;
@@ -2753,17 +2815,20 @@
     if (Scene.t > T_SNOW) startSnowfall();
     Scene.topY = ($("#safe").offsetHeight || 0) + 4;
     Scene.build();
-    if (Scene.t >= T_REVEAL + D_REVEAL) for (const p of Scene.P) p.cov = -10;
+    if (Scene.t >= T_TREE) for (const p of Scene.P) p.cov = -10;
     if (Scene.t >= T_GIFTS + 3) for (const g of Scene.gifts) g.landed = true;
     Scene.textRects = null;
   }
   function updateCam(dt) {
     const t = Scene.running ? Scene.t : 0, idle = Scene.running ? clamp((t - T_DONE) / 5) : 0;
-    cam.z = 1 + .12 * (1 - easeIO(clamp(t / T_PULL)));
+    // follow the falling seed down to the snow, stay close on the sprout, then pull back as the tree grows
+    const sf = Scene.running ? ease(clamp((t - T_SEED + .2) / 1.6)) * (1 - easeIO(clamp((t - T_GROW - .4) / (D_GROW * .75)))) : 0;
+    cam.z = 1 + .12 * (1 - easeIO(clamp(t / T_PULL))) + .5 * sf;
+    const fy = H * FOCUS, seedY = sf > 0 ? sf * (H * .72 - (fy + (Scene.geo().base - fy) * cam.z)) : 0;
     cam.px += (cam.tx - cam.px) * Math.min(1, dt * 2.5);
     cam.py += (cam.ty - cam.py) * Math.min(1, dt * 2.5);
     cam.x = cam.px + idle * (4 * Math.sin(GT * .11) + 2 * Math.sin(GT * .23 + 1));
-    cam.y = cam.py + idle * 2.5 * Math.sin(GT * .09 + 2);
+    cam.y = cam.py + idle * 2.5 * Math.sin(GT * .09 + 2) + seedY;
   }
   let last = performance.now();
   function frame(now) {
