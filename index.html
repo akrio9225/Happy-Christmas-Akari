@@ -1469,15 +1469,79 @@
   }
   const drawLayer = (L, off) => ctx.drawImage(L.c, -M, L.top + off, W + 2 * M, L.h);
 
+  /* ================= Snowy fir boughs framing the top corners ================= */
+  function boughGeo() { const bw = Math.min(W * .32, 230), y0 = Scene.topY - 4; return { bw, y0, P: [[-14, y0 + 4], [bw * .5, y0 + 42], [bw, y0 + 18]] }; }
+  function boughAt(G, t) { const m = 1 - t, P = G.P; return [m * m * P[0][0] + 2 * m * t * P[1][0] + t * t * P[2][0], m * m * P[0][1] + 2 * m * t * P[1][1] + t * t * P[2][1]]; }
+  function stemY(G, x) { let best = 0, bd = 1e9; for (let i = 0; i <= 40; i++) { const [px, py] = boughAt(G, i / 40), d = Math.abs(px - x); if (d < bd) { bd = d; best = py; } } return best; }
+  function boughSprite(seed) {
+    const G = boughGeo(), key = `bough${seed}_${W}_${H}_${G.y0}_${DPR}`;
+    if (cache[key]) return cache[key];
+    if (!SPRIGS) buildSprigs();
+    const R = mulberry32(seed * 131), cw = G.bw + 60, ch = G.y0 + 120, c = mk(cw * DPR, ch * DPR), g = c.getContext("2d");
+    const stamp = (x, y, a, s, si, snowy) => {
+      const cs = Math.cos(a) * s * DPR, sn = Math.sin(a) * s * DPR, fy = Math.cos(a) < 0 ? -1 : 1;
+      g.setTransform(cs, sn, -sn * fy, cs * fy, x * DPR, y * DPR); g.drawImage(SPRIGS[si][R() * 3 | 0][snowy], 0, -SPR_H / 2, SPR_W, SPR_H);
+    };
+    const dirAt = t => { const [x0, y0] = boughAt(G, t), [x1, y1] = boughAt(G, Math.min(1, t + .01)); return Math.atan2(y1 - y0, x1 - x0); };
+    g.setTransform(DPR, 0, 0, DPR, 0, 0); g.lineCap = "round";
+    g.strokeStyle = "#24170e"; g.lineWidth = 3; g.beginPath();
+    for (let i = 0; i <= 30; i++) { const [x, y] = boughAt(G, i / 30); if (i) g.lineTo(x, y); else g.moveTo(x, y); }
+    g.stroke();
+    const twigs = [];
+    for (let i = 0; i < 7; i++) { const t = .08 + i * .13 + R() * .04, [x, y] = boughAt(G, t); twigs.push([x, y, .5 + R() * .9 + (i % 2) * .3, (24 + R() * 18) * (1 - t * .35)]); }
+    g.strokeStyle = "#2b1c11"; g.lineWidth = 1.4; g.beginPath();
+    for (const [x, y, a, L] of twigs) { g.moveTo(x, y); g.quadraticCurveTo(x + Math.cos(a - .3) * L * .5, y + Math.sin(a - .3) * L * .5, x + Math.cos(a) * L, y + Math.sin(a) * L); }
+    g.stroke();
+    const pts = [];
+    for (let i = 0; i < 140; i++) { const t = R(); pts.push([...boughAt(G, t), dirAt(t), 1.1 - t * .45]); }
+    for (const [x, y, a, L] of twigs) for (let j = 0; j < 9; j++) { const f = j / 9; pts.push([x + Math.cos(a) * L * f, y + Math.sin(a) * L * f, a, .8 - f * .25]); }
+    for (let i = pts.length - 1; i > 0; i--) { const j = R() * (i + 1) | 0; [pts[i], pts[j]] = [pts[j], pts[i]]; }
+    for (const [x, y, a0, sz] of pts) { // needles: darker underneath, snowy on top
+      const a = a0 + (R() < .68 ? 1 : -1) * (.45 + R() * .9), down = Math.sin(a) > 0;
+      stamp(x, y, a, (1.05 + R() * .55) * sz, down ? R() * 2 | 0 : 2 + (R() * 2 | 0), down ? 0 : R() < .55 ? 1 : 0);
+    }
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const cone = coneSprite();
+    for (const t of [.3, .6]) { const [x, y] = boughAt(G, t); g.save(); g.translate(x, y + 2); g.rotate((R() - .5) * .4); g.scale(.46, .46); g.drawImage(cone.c, -cone.ax, -cone.ay); g.restore(); }
+    g.globalCompositeOperation = "source-atop";
+    const sh = g.createLinearGradient(0, G.y0, 0, G.y0 + 90); sh.addColorStop(0, "rgba(0,0,10,0)"); sh.addColorStop(1, "rgba(0,0,10,.38)");
+    g.fillStyle = sh; g.fillRect(0, 0, cw, ch); g.globalCompositeOperation = "source-over";
+    const clump = (x, y, rx) => { // a soft lump of fresh snow
+      const gr = g.createRadialGradient(x - rx * .2, y - rx * .25, 0, x, y, rx);
+      gr.addColorStop(0, "rgba(255,255,255,.92)"); gr.addColorStop(.6, "rgba(230,238,255,.72)"); gr.addColorStop(1, "rgba(214,226,252,0)");
+      g.fillStyle = gr; g.beginPath(); g.ellipse(x, y, rx, rx * .36, (R() - .5) * .3, 0, TAU); g.fill();
+    };
+    for (let i = 0; i < 34; i++) { const t = .03 + R() * .94, [x, y] = boughAt(G, t); clump(x + (R() - .5) * 10, y - 2 - R() * 4, (3 + R() * 5.5) * (1 - t * .35)); }
+    for (const [x, y, a, L] of twigs) for (let j = 1; j < 4; j++) { const f = j / 4; if (R() < .35) clump(x + Math.cos(a) * L * f, y + Math.sin(a) * L * f - 2.5, 2 + R() * 2.5); }
+    const bulbs = [];
+    for (let i = 0; i < 7; i++) { const [x, y] = boughAt(G, .1 + i * .13); bulbs.push({ x: x + (R() - .5) * 6, y: y + 8 + R() * 10, c: ["bulb", "gold", "amber", "lred", "bulb", "gold", "lgreen"][(i + seed) % 7] }); }
+    g.strokeStyle = "rgba(18,12,8,.85)"; g.lineWidth = .8; g.beginPath(); g.moveTo(bulbs[0].x, bulbs[0].y);
+    for (let i = 1; i < bulbs.length; i++) { const a = bulbs[i - 1], b = bulbs[i]; g.quadraticCurveTo((a.x + b.x) / 2, Math.max(a.y, b.y) + 6, b.x, b.y); }
+    g.stroke();
+    return (cache[key] = { c, cw, ch, bulbs });
+  }
+
   /* ================= New Year fireworks, far away behind the mountains ================= */
   const FW_D = .25, FW_PAL = [["gold", "champ"], ["rose", "pink"], ["ice", "white"], ["lgreen", "gold"], ["lred", "gold"], ["lblue", "ice"], ["champ", "white"]];
   let fw = [], fwRockets = [], fwFlash = [];
   function launchFirework(x, y, kind) {
-    fwRockets.push({ x0: x + rand(-30, 30), y0: H * .74, x, y, t: 0, d: rand(.95, 1.25), kind: kind || (Math.random() < .25 ? "ring" : "sphere"),
+    fwRockets.push({ x0: x + rand(-30, 30), y0: H * .74, x, y, t: 0, d: rand(.95, 1.25), kind: kind || (Math.random() < .25 ? "ring" : "sphere"), str: "I love you",
       pal: kind === "heart" ? ["lred", "pink"] : FW_PAL[Math.random() * FW_PAL.length | 0] });
     if (sfx) sweep(actx.currentTime, 1, 700, 2600, .022);
   }
+  let fwText = [];
+  function textBurst(r) { // sparks that fly into handwriting, hang in the sky, then drift down as glitter
+    const maxW = Math.min(W * .86, 390), fs = maxW * .245, c = mk(maxW * 1.15, fs * 1.7), g = c.getContext("2d");
+    g.font = `${fs}px "Great Vibes", cursive`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#fff"; g.fillText(r.str, c.width / 2, c.height / 2);
+    const d = g.getImageData(0, 0, c.width, c.height).data, pts = [], st = Math.max(2, Math.round(fs / 26));
+    for (let y = 0; y < c.height; y += st) for (let x = 0; x < c.width; x += st) if (d[(y * c.width + x) * 4 + 3] > 150) pts.push([x - c.width / 2, y - c.height / 2]);
+    for (let i = pts.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [pts[i], pts[j]] = [pts[j], pts[i]]; }
+    pts.slice(0, 380).forEach(([px, py], i) => fwText.push({ sx: r.x, sy: r.y, tx: r.x + px, ty: r.y + py, t: -Math.random() * .2, c: i % 7 === 0 ? "rose" : i % 2 ? "gold" : "champ", ph: rand(0, TAU), fall: rand(3.6, 4.4), f: 0, x: 0, y: 0, vx: 0, vy: 0 }));
+    fwFlash.push({ x: r.x, y: r.y, c: "gold", a: .6 });
+    if (sfx) { const a = actx.currentTime; noise(a, 1.4, 150, .3, "lowpass"); [1047, 1319, 1568, 2093, 2637].forEach((f, i) => bell(f, a + .5 + i * .13, .6, .03, sfx)); }
+  }
   function explode(r) {
+    if (r.kind === "text") { textBurst(r); return; }
     const heart = r.kind === "heart", n = heart ? 96 : r.kind === "ring" ? 56 : 84, sp = rand(95, 125) * clamp(Math.min(W, H) / 420, .85, 1.6);
     for (let i = 0; i < n; i++) {
       let vx, vy;
@@ -1490,7 +1554,7 @@
     if (sfx) { const a = actx.currentTime; noise(a, 1.5, 150, .35, "lowpass"); pad(49, a, .5, .07, sfx); for (let i = 0; i < 10; i++) noise(a + .45 + Math.random(), .035, 5000, .045, "highpass"); }
   }
   function drawFireworks(dt) {
-    if (!fw.length && !fwRockets.length && !fwFlash.length) return;
+    if (!fw.length && !fwRockets.length && !fwFlash.length && !fwText.length) return;
     view(FW_D); ctx.globalCompositeOperation = "lighter";
     for (let i = fwFlash.length - 1; i >= 0; i--) { const f = fwFlash[i]; glow(f.c, f.x, f.y, Math.min(W, H) * .55, f.a * .35); f.a -= dt * 1.2; if (f.a <= 0) fwFlash.splice(i, 1); }
     for (let i = fwRockets.length - 1; i >= 0; i--) {
@@ -1499,6 +1563,20 @@
       glow("cream", x, y, 2.4, .9); glow("amber", x, y, 6, .25);
       if (Math.random() < .8) fw.push({ x, y, vx: rand(-5, 5), vy: rand(8, 26), life: .5, dec: 1.3, c: "amber", s: 1.1, g: 18, tw: 0 });
       if (f >= 1) { explode(r); fwRockets.splice(i, 1); }
+    }
+    for (let i = fwText.length - 1; i >= 0; i--) {
+      const p = fwText[i]; p.t += dt;
+      if (p.t < 0) continue;
+      let x, y, a;
+      if (p.t < 1.3) { const e = ease(p.t / 1.3), sw = (1 - e) * 26; x = p.sx + (p.tx - p.sx) * e + Math.cos(p.ph + e * 5) * sw; y = p.sy + (p.ty - p.sy) * e + Math.sin(p.ph + e * 5) * sw; a = Math.min(1, p.t * 5); }
+      else if (p.t < p.fall) { x = p.tx; y = p.ty; a = .78 + .22 * Math.sin(GT * 5 + p.ph); }
+      else {
+        if (!p.f) { p.f = 1; p.x = p.tx; p.y = p.ty; p.vx = rand(-6, 6); p.vy = rand(2, 12); }
+        p.vy += 26 * dt; p.x += p.vx * dt; p.y += p.vy * dt; x = p.x; y = p.y; a = 1 - (p.t - p.fall) / 1.7;
+        if (a <= 0) { fwText.splice(i, 1); continue; }
+        if (Math.sin(GT * 30 + p.ph) < -.4) a *= .3;
+      }
+      glow(p.c, x, y, 5.5, .3 * a); glow(p.c, x, y, 1.9, a);
     }
     const drag = Math.pow(.3, dt);
     for (let i = fw.length - 1; i >= 0; i--) {
@@ -1565,7 +1643,7 @@
       this.t = 0; this.running = true; this.fired = {}; this.starBoost = this.moonBoost = 0; this.ring = null; this.textRects = null;
       this.shake = this.shakeV = 0; this.fly = null; this.nextFly = Infinity; this.crystT = 9; this.nextGust = T_DONE + 7;
       this.sc = { gift: "held", tGive: -1, tOpen: -1, tClose: -1, waveT: 0, lower: 0, low: 0, bub: null, talk: 0, blink: 0, rect: null, gpos: null };
-      this.hearts = []; fw = []; fwRockets = []; fwFlash = [];
+      this.hearts = []; fw = []; fwRockets = []; fwFlash = []; fwText = [];
       document.body.classList.remove("p-text");
       hideHint(); hideCard(); hintEl.classList.remove("side");
     },
@@ -2057,18 +2135,38 @@
         }
       }
 
-      /* delicate gold stars hanging from the top (fixed to the screen) */
+      /* snowy fir boughs frame the top corners, with warm little lights */
+      const kb = K(T_FRONT + .6, 1.8), keB = ease(kb);
+      if (kb > 0) {
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        const on = K(T_PATHL + .4, .8);
+        for (const side of [0, 1]) {
+          const B = boughSprite(side + 1);
+          ctx.save(); if (side) { ctx.translate(W, 0); ctx.scale(-1, 1); }
+          ctx.translate(-(1 - keB) * 90, -(1 - keB) * 70); ctx.rotate(Math.sin(t * .6 + side * 2) * .01 + GUST * .02);
+          ctx.globalAlpha = Math.min(1, kb * 2); ctx.drawImage(B.c, 0, 0, B.cw, B.ch);
+          if (on > 0) {
+            ctx.globalCompositeOperation = "lighter";
+            B.bulbs.forEach((b, i) => { const tw = (.72 + .28 * Math.sin(t * 1.8 + i * 1.7)) * on; glow(b.c, b.x, b.y, 16, .3 * tw); glow(b.c, b.x, b.y, 4.2, tw); });
+            ctx.globalCompositeOperation = "source-over";
+          }
+          ctx.restore();
+        }
+      }
+
+      /* delicate gold stars hanging from the boughs (fixed to the screen) */
       const okn = K(T_ORN, 1.2);
       if (okn > 0) {
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-        const gs = goldStarSprite();
+        const gs = goldStarSprite(), BG = boughGeo();
         for (const o of this.orns) { // faceted gold stars that slowly turn on their threads
           o.w += (-14 * Math.sin(o.th) - o.w * .9 + Math.sin(t * 1.2 + o.ph) * .5) * dt; o.th += o.w * dt;
-          const len = o.len * easeBack(okn), ax = o.xN * W, ay = this.topY, ex = ax + Math.sin(o.th) * len, ey = ay + Math.cos(o.th) * len;
+          const right = o.xN > .5, ax = o.xN * W + (right ? 1 : -1) * (1 - keB) * 90, ay = stemY(BG, right ? W - o.xN * W : o.xN * W) - (1 - keB) * 70 + 4;
+          const len = o.len * easeBack(okn), ex = ax + Math.sin(o.th) * len, ey = ay + Math.cos(o.th) * len;
           const k = o.s * 1.25 / 22, spin = Math.cos(t * .8 + o.ph * 2), cy = ey + (33 - gs.ay) * k;
           o.x = ex; o.y = cy;
           ctx.globalAlpha = .5 * okn; ctx.strokeStyle = "#e7d3a4"; ctx.lineWidth = .8;
-          ctx.beginPath(); ctx.moveTo(ax, 0); ctx.lineTo(ax, ay); ctx.lineTo(ex, ey); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ex, ey); ctx.stroke();
           ctx.globalCompositeOperation = "lighter"; glow("champ", ex, cy, o.s * 2.4, (.16 + .12 * Math.abs(spin)) * okn); ctx.globalCompositeOperation = "source-over";
           ctx.save(); ctx.translate(ex, ey); ctx.rotate(-o.th); ctx.scale(k * (.12 + .88 * Math.abs(spin)), k); ctx.globalAlpha = okn;
           ctx.drawImage(gs.c, -gs.ax, -gs.ay); ctx.restore();
@@ -2127,15 +2225,15 @@
       const sc = this.sc;
       if (!sc || sc.gift !== "open" || sc.tClose > 0) return;
       hideCard(); sc.tClose = this.t; sc.relower = this.t + 2.4;
-      sc.fwShow = this.t + 2; sc.nextFw = this.t + 16; sc.nextWave = this.t + 14; // then: New Year fireworks
-      setTimeout(() => this.running && showHint("tap the sky for fireworks ✦", 6500), 10500);
-      setTimeout(() => this.running && showHint("tap the star · touch the tree", 6500), 18500);
-      setTimeout(() => this.running && showHint("drag to look around · tap Santa to say hi", 7500), 26500);
+      sc.fwShow = this.t + 2; sc.nextFw = this.t + 30; sc.nextWave = this.t + 22; // then: New Year fireworks
+      setTimeout(() => this.running && showHint("tap the sky for fireworks ✦", 6500), 20500);
+      setTimeout(() => this.running && showHint("tap the star · touch the tree", 6500), 28500);
+      setTimeout(() => this.running && showHint("drag to look around · tap Santa to say hi", 7500), 36500);
     },
     drawSantaClose(t, dt) {
       const sc = this.sc, u = t - T_SC, s = Math.min(W / 402, H / 874) * .8;
       const rise = easeBack(clamp(u / 1.7));
-      this.once("sc0", T_SC, () => { jingle(2.4, .7); whoosh(.9, .12); sc.waveT = SC_GIFT - .4; hintEl.classList.add("side"); });
+      this.once("sc0", T_SC, () => { jingle(2.4, .7); whoosh(.9, .12); playJingle(); sc.waveT = SC_GIFT - .4; hintEl.classList.add("side"); });
       this.once("sc1", SC_HI, () => this.say(["Ho ho ho!", "Merry Christmas, Akari!"], 4.2));
       this.once("sc2", SC_GIFT, () => this.say(["I brought you a", "very special gift…"], 3));
       this.once("sc3", SC_GIVE, () => { sc.gift = "fly"; sc.tGive = t; chime(.06); sweep(actx ? actx.currentTime : 0, 1.2, 500, 3200, .05); });
@@ -2145,9 +2243,9 @@
       if (sc.nextWave && t > sc.nextWave && !sc.bub) { sc.waveT = t + 2.4; sc.nextWave = t + rand(18, 26); } // a friendly wave now and then
       if (sc.fwShow > 0) { // a little New Year show, ending with a heart
         const S0 = sc.fwShow;
-        [[.22, .42, 0], [.78, .38, .7], [.4, .3, 1.5], [.64, .45, 2.1], [.15, .3, 2.9], [.86, .29, 3.6], [.5, .33, 4.9, "heart"]].forEach(([xn, yn, d, kind], i) =>
+        [[.22, .42, 0], [.78, .38, .7], [.4, .3, 1.5], [.64, .45, 2.1], [.15, .3, 2.9], [.86, .29, 3.6], [.5, .33, 4.9, "heart"], [.5, .35, 9, "text"]].forEach(([xn, yn, d, kind], i) =>
           this.once("fw" + i, S0 + d, () => { const [wx, wy] = toWorld(W * xn, H * yn, FW_D); launchFirework(wx, wy, kind); }));
-        this.once("fwhny", S0 + 6.4, () => { sc.lower = 0; sc.waveT = this.t + 3.6; sc.relower = this.t + 5.6; this.say(["Ho ho ho!", "Happy New Year, Akari!"], 4); });
+        this.once("fwhny", S0 + 14.6, () => { sc.lower = 0; sc.waveT = this.t + 3.6; sc.relower = this.t + 5.6; this.say(["Ho ho ho!", "Happy New Year, Akari!"], 4); });
         if (t > sc.nextFw) { sc.nextFw = t + rand(18, 30); const [wx, wy] = toWorld(W * rand(.15, .85), H * rand(.28, .46), FW_D); launchFirework(wx, wy); }
       }
       if (sc.cardAt && t > sc.cardAt) { sc.cardAt = 0; showCard(); if (sfx) softChord([261.63, 329.63, 392, 493.88], actx.currentTime, 4, .02, sfx); }
@@ -2367,6 +2465,14 @@
     ["C6", 3], ["G5", 1], ["E5", 2], ["G5", 3], ["F5", 1], ["D5", 2], ["C5", 12]
   ];
   const SN_BARS = "CCCCGGCCFCCCFCCCGGCCCGCC";
+  // "Jingle Bells" (James Lord Pierpont, 1857) — public domain. The chorus, for Santa's arrival.
+  const JB = [
+    ["E5", 2], ["E5", 2], ["E5", 4], ["E5", 2], ["E5", 2], ["E5", 4], ["E5", 2], ["G5", 2], ["C5", 3], ["D5", 1], ["E5", 8],
+    ["F5", 2], ["F5", 2], ["F5", 3], ["F5", 1], ["F5", 2], ["E5", 2], ["E5", 2], ["E5", 1], ["E5", 1], ["E5", 2], ["D5", 2], ["D5", 2], ["E5", 2], ["D5", 4], ["G5", 4],
+    ["E5", 2], ["E5", 2], ["E5", 4], ["E5", 2], ["E5", 2], ["E5", 4], ["E5", 2], ["G5", 2], ["C5", 3], ["D5", 1], ["E5", 8],
+    ["F5", 2], ["F5", 2], ["F5", 2], ["F5", 2], ["F5", 2], ["E5", 2], ["E5", 2], ["E5", 1], ["E5", 1], ["G5", 2], ["G5", 2], ["F5", 2], ["D5", 2], ["C5", 8]
+  ];
+  const JB_BARS = "CCCCFCGGCCCCFCGC";
   const FQ = { C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880, B5: 987.77, C6: 1046.5, D6: 1174.66, E6: 1318.51, F6: 1396.91 };
   const CHD = { C: [130.81, 164.81, 196], G: [98, 123.47, 146.83], F: [87.31, 110, 130.81] };
   let actx = null, master = null, sfx = null, verb = null, playing = false, resumeMusic = false, loopTimer = null, windNode = null;
@@ -2454,6 +2560,22 @@
   function stopMusic() {
     playing = false; clearTimeout(loopTimer);
     if (master) { const old = master; old.gain.setTargetAtTime(0, actx.currentTime, .06); setTimeout(() => old.disconnect(), 500); master = null; }
+  }
+  function playJingle() { // Santa's arrival: a music-box Jingle Bells, then back to Silent Night
+    if (!sfx || document.hidden) return;
+    stopMusic();
+    setTimeout(() => {
+      if (document.hidden || playing) return;
+      master = actx.createGain(); master.gain.value = .5; master.connect(actx.destination); master.connect(verb);
+      playing = true;
+      const e = .17, start = actx.currentTime + .08; let when = start;
+      for (const [n, d] of JB) { bell(FQ[n], when, Math.min(d * e, .9), .11, master); when += d * e; }
+      for (let b = 0; b < JB_BARS.length; b++) {
+        const ch = CHD[JB_BARS[b]], tb = start + b * 8 * e;
+        bell(ch[0], tb, .6, .045, master); bell(ch[1] * 2, tb + 2 * e, .2, .016, master); bell(ch[2] * 2, tb + 6 * e, .2, .016, master);
+      }
+      clearTimeout(loopTimer); loopTimer = setTimeout(() => playing && loop(), (when - start) * 1000 + 900);
+    }, 650);
   }
   function drone() {
     const t = actx.currentTime;
