@@ -1673,6 +1673,19 @@
       const G = this.geo();
       this.tree = buildTree(G.mw, G.th);
       this.world = buildWorld();
+      { // the constellation outline of the tree-to-be: zigzag tiers down to a little trunk (right half; the left is its mirror)
+        const T = this.tree, R = [[0, 0]], N = 6;
+        for (let k = 1; k <= N; k++) {
+          const h = k / N, y = h * T.th * T.HF, e = T.env(h);
+          R.push([e * .98, y + e * (.1 + .14 * h)]);
+          if (k < N) R.push([e * .48, y + e * .05]);
+        }
+        const tw = Math.max(4, T.mw * .075);
+        R.push([tw * .9, T.th * T.HF + T.env(1) * .1], [tw * .6, T.th], [0, T.th]);
+        const cum = [0]; let L = 0;
+        for (let i = 1; i < R.length; i++) { L += Math.hypot(R[i][0] - R[i - 1][0], R[i][1] - R[i - 1][1]); cum.push(L); }
+        this.outline = { R, cum, L, tips: 2 * N - 1 };
+      }
       const T = this.tree, P = [];
       const add = (kind, tx, ty) => { const p = { kind, tx, ty, sxN: rand(.02, .98), syN: rand(.02, .78), curve: rand(-80, 80), delay: rand(0, 1.4) + ty / G.th * .3, tw: rand(0, TAU), ts: rand(.8, 2.6), cov: -1 }; P.push(p); return p; };
       for (const l of T.lights) l.p = add("light", l.x, l.y);
@@ -1713,6 +1726,35 @@
       const P = [[-.3 * W, .66 * H], [.25 * W, .5 * H], [.62 * W, .2 * H], [1.35 * W, .06 * H]];
       const m = 1 - u, b = [m * m * m, 3 * m * m * u, 3 * m * u * u, u * u * u];
       return [b.reduce((s, k, i) => s + k * P[i][0], 0), b.reduce((s, k, i) => s + k * P[i][1], 0)];
+    },
+    drawConstellation(t, cx, apex, S) { // thin lines of light draw the tree-to-be; it fades as the real tree grows into it
+      const O = this.outline, t0 = T_FORM + FLY + 1.1;
+      if (!O || t < t0) return;
+      const fade = 1 - clamp((t - T_GROW - .4) / 2.4);
+      if (fade <= 0) return;
+      const at = d => { let i = 1; while (i < O.R.length - 1 && O.cum[i] < d) i++; const a = O.R[i - 1], b = O.R[i], f = clamp((d - O.cum[i - 1]) / ((O.cum[i] - O.cum[i - 1]) || 1)); return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; };
+      const line = (d0, d1, sg) => { // the outline between two distances along it
+        const [x0, y0] = at(d0); ctx.beginPath(); ctx.moveTo(cx + sg * x0, apex + y0);
+        for (let i = 1; i < O.R.length; i++) if (O.cum[i] > d0 && O.cum[i] < d1) ctx.lineTo(cx + sg * O.R[i][0], apex + O.R[i][1]);
+        const [x1, y1] = at(d1); ctx.lineTo(cx + sg * x1, apex + y1); ctx.stroke();
+      };
+      const drawn = ease(clamp((t - t0) / 1.9)) * O.L, pu = (t - (T_SEED - 3.1)) / 1.8, pd = (1 - easeIO(clamp(pu))) * O.L;
+      ctx.globalCompositeOperation = "lighter"; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "rgb(255,236,204)";
+      for (const sg of [1, -1]) {
+        ctx.globalAlpha = .07 * fade; ctx.lineWidth = 3.2 * S; line(0, drawn, sg);
+        ctx.globalAlpha = .4 * fade; ctx.lineWidth = .8 * S; line(0, drawn, sg);
+        if (pu > 0 && pu < 1) { // light gathers up the outline into the top star
+          ctx.globalAlpha = .8 * fade; ctx.lineWidth = 1.6 * S; line(pd, Math.min(O.L, pd + O.L * .09), sg);
+          const [qx, qy] = at(pd); glow("cream", cx + sg * qx, apex + qy, 12 * S, .55 * fade); glow("white", cx + sg * qx, apex + qy, 3.4 * S, .9 * fade);
+        }
+        for (let i = 1; i < O.R.length - 1; i++) { // a brighter star on every branch tip
+          if (O.cum[i] > drawn) break;
+          const tip = i % 2 === 1 && i <= O.tips, near = pu > 0 && pu < 1 ? Math.max(0, 1 - Math.abs(O.cum[i] - pd) / (O.L * .06)) : 0;
+          const tw = .75 + .25 * Math.sin(t * 2 + i * 1.7 + sg);
+          glow("white", cx + sg * O.R[i][0], apex + O.R[i][1], (tip ? 2.6 : 1.7) * S * (1 + near), Math.min(1, ((tip ? .95 : .6) * tw + near) * fade));
+        }
+      }
+      ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
     },
     drawRoots(t, cx, y1, S) { // golden roots of light spread out over the snow from the seed, then fade as the tree grows
       if (!this.roots || t < T_LAND) return;
@@ -2125,6 +2167,7 @@
           if (Math.random() < .9) sparks.push({ x: hx + skew * (base - hy), y: hy, vx: rand(-30, 30), vy: rand(-10, 40), life: 1, dec: rand(1, 1.6), size: rand(2.5, 5), c: "champ", g: 50 });
         }
       }
+      this.drawConstellation(t, cx, apex, S);
       for (const p of this.P) {
         const k = ease(clamp((t - T_FORM - p.delay) / FLY));
         if (k >= 1 && p.kind === "light") continue;
@@ -2188,6 +2231,7 @@
       }
       this.drawRoots(t, cx, base - 3 * S, S);
       this.drawSeed(t, sx, sy, cx, base, S);
+      this.once("gather", T_SEED - 3.1, () => { if (sfx) { const a = actx.currentTime; [523.25, 659.25, 783.99, 1046.5, 1318.5, 1568].forEach((f, i) => bell(f, a + i * .3, .6, .022, sfx)); sweep(a, 1.9, 400, 3000, .022); } });
       this.once("seed", T_SEED - .1, () => { if (sfx) { const a = actx.currentTime; [2637, 2349, 2093, 1760, 1568, 1319, 1047].forEach((f, i) => bell(f, a + i * .22, .5, .028, sfx)); noise(a, 1, 5200, .04, "highpass"); } });
       this.once("land", T_LAND, () => { const y1 = base - 3 * S; this.roots = makeRoots(S); snowPuff(cx, y1, 12, .7); burst(cx, y1, 18, "gold"); if (sfx) { const a = actx.currentTime; bell(784, a, 1.4, .07, sfx); bell(1175, a + .05, 1, .03, sfx); pad(130.81, a, 3.5, .05, sfx); } });
       this.once("sprout", T_SPROUT, () => { arpeggio([523.25, 659.25, 783.99], .16, .03); setTimeout(startMusic, 1200); });
