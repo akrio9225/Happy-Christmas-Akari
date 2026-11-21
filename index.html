@@ -56,8 +56,25 @@
     filter: drop-shadow(0 0 14px rgba(255, 214, 150, .4));
     animation: rise 1.6s ease .7s forwards, sheen 5s ease-in-out 2.4s infinite;
   }
+  .env { width: min(60vw, 250px); margin: 22px 0 4px; opacity: 0; animation: rise 1.4s ease 1s forwards; filter: drop-shadow(0 12px 22px rgba(0, 0, 12, .55)) drop-shadow(0 0 22px rgba(255, 214, 150, .16)); }
+  .env svg { display: block; width: 100%; height: auto; overflow: visible; animation: bob 4.6s ease-in-out 2.4s infinite; }
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+  .env .e-flap, .env .e-flap-o { transform-box: view-box; transform-origin: 110px 40px; }
+  .env .e-flap-o { transform: scaleY(0); }
+  .env .e-seal { transform-box: view-box; transform-origin: 110px 107px; }
+  .env .e-letter { transition: transform 1.05s cubic-bezier(.2, .8, .2, 1) .85s; }
+  .env .e-glow { opacity: 0; transition: opacity .9s ease .75s; }
+  .begin.open .e-seal { animation: sealpop .45s ease forwards; }
+  .begin.open .e-flap { animation: flapfold .3s ease-in .28s forwards; }
+  .begin.open .e-flap-o { animation: flapopen .36s ease-out .58s forwards; }
+  .begin.open .e-letter { transform: translateY(-58px); }
+  .begin.open .e-glow { opacity: 1; }
+  .begin.open .go, .begin.open small { animation: none; opacity: 0; }
+  @keyframes sealpop { 0% { transform: scale(1); opacity: 1; } 40% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
+  @keyframes flapfold { to { transform: scaleY(0); } }
+  @keyframes flapopen { from { transform: scaleY(0); } to { transform: scaleY(-1); } }
   .begin .go {
-    margin-top: 36px; font-family: "Cinzel", serif; font-size: 12.5px; letter-spacing: .48em; padding-left: .48em; text-transform: uppercase; color: var(--cream);
+    margin-top: 22px; font-family: "Cinzel", serif; font-size: 12.5px; letter-spacing: .48em; padding-left: .48em; text-transform: uppercase; color: var(--cream);
     opacity: 0; animation: rise 1.2s ease 1.4s forwards, breathe 2.8s ease-in-out 2.6s infinite;
   }
   .begin small { margin-top: 12px; font-size: 15px; font-style: italic; color: rgba(225, 232, 255, .5); opacity: 0; animation: rise 1.2s ease 1.8s forwards; }
@@ -162,10 +179,39 @@
   <span class="b-sub">&amp; a magical New Year together</span>
 </div>
 
-<div class="begin" id="begin" role="button" tabindex="0" aria-label="Tap to begin">
+<div class="begin" id="begin" role="button" tabindex="0" aria-label="Tap to open">
   <p class="kicker">A Christmas sky for</p>
   <p class="script">Akari</p>
-  <p class="go">Tap to begin</p>
+  <div class="env" aria-hidden="true">
+    <svg viewBox="0 30 220 134">
+      <defs>
+        <linearGradient id="eP" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbf4e6"/><stop offset="1" stop-color="#e6d6b8"/></linearGradient>
+        <linearGradient id="eF" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f8efdf"/><stop offset="1" stop-color="#e2d0ae"/></linearGradient>
+        <linearGradient id="eI" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8c1a2b"/><stop offset="1" stop-color="#4c0a16"/></linearGradient>
+        <linearGradient id="eG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#b98a3e"/><stop offset=".5" stop-color="#f6e2a8"/><stop offset="1" stop-color="#b98a3e"/></linearGradient>
+        <radialGradient id="eS" cx=".38" cy=".35" r=".7"><stop offset="0" stop-color="#dc3a4e"/><stop offset=".6" stop-color="#a3172b"/><stop offset="1" stop-color="#6a0a19"/></radialGradient>
+        <radialGradient id="eL" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff3d6" stop-opacity=".95"/><stop offset="1" stop-color="#ffd9a0" stop-opacity="0"/></radialGradient>
+      </defs>
+      <circle class="e-glow" cx="110" cy="62" r="118" fill="url(#eL)"/>
+      <rect x="2" y="40" width="216" height="120" rx="7" fill="url(#eI)"/>
+      <path class="e-flap-o" d="M2 40 L110 108 L218 40 Z" fill="url(#eI)" stroke="url(#eG)" stroke-width="1.2"/>
+      <g class="e-letter">
+        <rect x="18" y="50" width="184" height="104" rx="4" fill="#fffaf0"/>
+        <path d="M110 71.6C108.9 64.9 98.5 64.9 99 74.4C99.6 80.4 106.2 83.5 110 87.1C113.8 83.5 120.5 80.4 121 74.4C121.5 64.9 111.1 64.9 110 71.6Z" fill="#c8243a"/>
+        <path d="M50 98H170M58 110H162M70 122H150" stroke="#dcc38e" stroke-width="1.4" stroke-linecap="round"/>
+      </g>
+      <path d="M2 40L110 104L218 40V153Q218 160 211 160H9Q2 160 2 153Z" fill="url(#eP)"/>
+      <path d="M3 159L96 96M217 159L124 96" stroke="rgba(150,120,80,.25)" stroke-width="1"/>
+      <path d="M2 40L110 104L218 40" fill="none" stroke="url(#eG)" stroke-width="1"/>
+      <path class="e-flap" d="M2 40L110 110L218 40Z" fill="url(#eF)" stroke="url(#eG)" stroke-width="1.2"/>
+      <g class="e-seal">
+        <path d="M110 92.5C118 92 125.5 98 125.2 106C127 109 124.5 113 122.6 115.5C120 121.5 112 124 106 122.6C100.5 121.5 95.6 117 95 111C93.4 108 94.5 103.5 97.3 100.4C100 95.5 104.5 92.8 110 92.5Z" fill="url(#eS)"/>
+        <circle cx="110" cy="107.5" r="10.5" fill="none" stroke="rgba(255,205,195,.35)" stroke-width="1"/>
+        <path d="M110 105.6C109.4 102 103.7 102 104 107.1C104.3 110.4 107.9 112.1 110 114C112.1 112.1 115.7 110.4 116 107.1C116.3 102 110.6 102 110 105.6Z" fill="#f2b8a8" opacity=".85"/>
+      </g>
+    </svg>
+  </div>
+  <p class="go">Tap to open</p>
   <small>turn your sound on</small>
 </div>
 
@@ -2680,10 +2726,14 @@
   function doBegin() {
     if (Scene.begun) return;
     Scene.begun = true;
-    begin.classList.add("hide");
-    try { audio(); drone(); } catch (_) {}
+    begin.classList.add("open");
+    try { audio(); openSound(); } catch (_) {}
     unlockVoice();
-    Scene.start();
+    setTimeout(() => { // golden sparks as the letter comes out
+      const r = $(".env").getBoundingClientRect(), [x, y] = toWorld(r.left + r.width / 2, r.top + r.height * .25, 1);
+      burst(x, y, 46, "gold");
+    }, 950);
+    setTimeout(() => { begin.classList.add("hide"); try { drone(); } catch (_) {} Scene.start(); }, 1500);
   }
   begin.addEventListener("click", doBegin);
   begin.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") doBegin(); });
@@ -2874,6 +2924,13 @@
   }
   function swell() { if (sfx) { const t = actx.currentTime; pad(65.41, t, 6, .07, sfx); pad(98, t + .6, 6, .05, sfx); } }
   function arpeggio(notes, gap, vol) { if (!sfx) return; const t = actx.currentTime; notes.forEach((f, i) => bell(f, t + i * gap, .4, vol, sfx)); }
+  function openSound() { // paper, a little crack of wax, then a chime as the letter comes out
+    if (!sfx) return;
+    const a = actx.currentTime;
+    noise(a + .02, .22, 1800, .05); noise(a + .3, .1, 5200, .05, "highpass"); bell(1568, a + .3, .35, .03, sfx);
+    noise(a + .55, .55, 1100, .04);
+    [1046.5, 1318.5, 1568, 2093].forEach((f, i) => bell(f, a + .95 + i * .09, .7, .035, sfx));
+  }
   function whoosh(len = 1.6, vol = .2) { if (sfx) noise(actx.currentTime, len, 700, vol); }
   function jingle(dur, vol = 1) {
     if (!sfx) return;
@@ -2951,6 +3008,8 @@
     ctx.clearRect(0, 0, W, H);
     drawSky(GT, dt);
     ctx.save(); Scene.draw(dt, GT); ctx.restore();
+    const pre = Scene.running ? 1 - clamp(Scene.t / 1.6) : 1;
+    if (pre > 0) { ctx.save(); drawSnow(dt, .3 * pre); ctx.restore(); }
     drawSparks(dt);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.globalAlpha = 1; ctx.drawImage(vigCv, 0, 0, W, H);
