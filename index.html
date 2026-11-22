@@ -931,6 +931,9 @@
     ctx.beginPath(); ctx.moveTo(-11, -26); ctx.quadraticCurveTo(-6, -32, -1, -26.5); ctx.quadraticCurveTo(-8, -31, -15, -31); ctx.closePath(); ctx.fill();
     ctx.beginPath(); ctx.arc(-15.5, -31, 1.8, 0, TAU); ctx.fill();
     ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-3, -14); ctx.lineTo(4, -10); ctx.stroke();
+    ctx.shadowBlur = 0; ctx.globalCompositeOperation = "lighter"; // Rudolph's nose, leading the way
+    const nb = .75 + .25 * Math.sin(t * 7); glow("lred", 150, -17, 18 * nb, .75 * alpha); glow("lred", 150, -17, 4.2, alpha); glow("white", 150, -17, 1.6, alpha);
+    ctx.globalCompositeOperation = "source-over";
     ctx.restore();
   }
 
@@ -1516,7 +1519,8 @@
     return {
       c, cw, ch, ax: mx, ay: yb, w, flare: 0,
       win: wins.map(([wx, y]) => ({ x: wx + ww / 2 - mx, y: y + wh / 2 - yb, w: ww, h: wh })),
-      chim: { x: chx + chimW / 2 - mx, y: chTop - yb }
+      chim: { x: chx + chimW / 2 - mx, y: chTop - yb },
+      roof: [[x0 - ov - mx, yw + 1 - yb], [0, yr - yb], [x1 + ov - mx, yw + 1 - yb]]
     };
   }
   function makeGift(w, h, d, P, Rb, pat) {
@@ -1621,27 +1625,33 @@
     }
     ctx.restore(); ctx.restore();
   }
-  function snowBall(r, face, buttons) {
-    const key = `sb${Math.round(r * DPR)}${face ? "f" : ""}${buttons ? "b" : ""}`;
+  function snowBall(r, face, buttons) { // packed snow: lumpy, shaded, frosted; coal eyes, rosy cheeks and a coal smile
+    const key = `sb2${Math.round(r * DPR)}${face ? "f" : ""}${buttons ? "b" : ""}`;
     if (cache[key]) return cache[key];
-    const S = Math.ceil((r * 2 + 6) * DPR), c = mk(S, S), g = c.getContext("2d"); g.scale(DPR, DPR);
+    const S = Math.ceil((r * 2 + 6) * DPR), c = mk(S, S), g = c.getContext("2d"), R = mulberry32(Math.round(r * 13) + (face ? 7 : 0)); g.scale(DPR, DPR);
     const m = r + 3;
-    let gr = g.createRadialGradient(m - r * .4, m - r * .45, r * .1, m, m, r * 1.05);
-    gr.addColorStop(0, "#ffffff"); gr.addColorStop(.55, "#e3e9f8"); gr.addColorStop(1, "#8f9ccb");
-    g.fillStyle = gr; g.beginPath(); g.ellipse(m, m, r, r * .96, 0, 0, TAU); g.fill();
+    g.beginPath(); for (let i = 0; i < 36; i++) { const a = i / 36 * TAU, q = r * (1 + (R() - .5) * .05); g.lineTo(m + Math.cos(a) * q, m + Math.sin(a) * q * .96); } g.closePath();
+    let gr = g.createRadialGradient(m - r * .35, m - r * .45, r * .1, m, m, r * 1.05);
+    gr.addColorStop(0, "#ffffff"); gr.addColorStop(.5, "#eaeffa"); gr.addColorStop(1, "#97a4d0");
+    g.fillStyle = gr; g.fill();
     g.save(); g.clip();
-    gr = g.createLinearGradient(m + r, 0, m + r * .2, 0); gr.addColorStop(0, "rgba(255,190,120,.35)"); gr.addColorStop(1, "rgba(255,190,120,0)");
+    gr = g.createLinearGradient(m + r, 0, m + r * .15, 0); gr.addColorStop(0, "rgba(255,190,120,.4)"); gr.addColorStop(1, "rgba(255,190,120,0)");
     g.fillStyle = gr; g.fillRect(m, 0, r + 3, m * 2);
-    for (let i = 0; i < r * 3; i++) { g.fillStyle = Math.random() < .5 ? "rgba(255,255,255,.5)" : "rgba(120,135,180,.18)"; g.fillRect(m + (Math.random() - .5) * r * 2, m + (Math.random() - .5) * r * 2, .8, .8); }
+    gr = g.createLinearGradient(0, m + r * .3, 0, m + r); gr.addColorStop(0, "rgba(70,85,140,0)"); gr.addColorStop(1, "rgba(70,85,140,.35)");
+    g.fillStyle = gr; g.fillRect(0, m, m * 2, m + 3);
+    for (let i = 0; i < r * 9; i++) { g.fillStyle = R() < .6 ? "rgba(255,255,255,.55)" : "rgba(110,125,175,.16)"; g.fillRect(m + (R() - .5) * r * 2, m + (R() - .5) * r * 2, .7, .7); }
+    g.fillStyle = "rgba(255,255,255,.95)"; for (let i = 0; i < r * .6; i++) g.fillRect(m + (R() - .5) * r * 1.6, m + (R() - .5) * r * 1.6, .9, .9);
     g.restore();
-    g.fillStyle = "#14161f";
+    const coal = (x, y, rr) => { g.fillStyle = "#15161c"; g.beginPath(); g.ellipse(x, y, rr, rr * .88, R() * TAU, 0, TAU); g.fill(); g.fillStyle = "rgba(255,255,255,.55)"; g.beginPath(); g.arc(x - rr * .35, y - rr * .35, rr * .3, 0, TAU); g.fill(); };
     if (face) {
-      for (const [ex, ey] of [[-.12, -.22], [.34, -.18]]) { g.beginPath(); g.arc(m + ex * r, m + ey * r, r * .095, 0, TAU); g.fill(); }
-      for (let i = 0; i < 5; i++) { const a = 1 + i * .25; g.beginPath(); g.arc(m + Math.cos(a) * r * .48 + r * .1, m + Math.sin(a) * r * .42 + r * .05, r * .05, 0, TAU); g.fill(); }
+      for (const sd of [-1, 1]) { const cx = m + sd * r * .44 + r * .08, cy = m + r * .1, cg = g.createRadialGradient(cx, cy, 0, cx, cy, r * .26); cg.addColorStop(0, "rgba(240,120,130,.5)"); cg.addColorStop(1, "rgba(240,120,130,0)"); g.fillStyle = cg; g.fillRect(cx - r * .3, cy - r * .3, r * .6, r * .6); }
+      coal(m - r * .14, m - r * .24, r * .1); coal(m + r * .3, m - r * .2, r * .1);
+      for (let i = 0; i < 6; i++) { const a = .95 + i * .23; coal(m + Math.cos(a) * r * .5 + r * .08, m + Math.sin(a) * r * .42 + r * .02, r * .05); }
     }
-    if (buttons) for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(m + r * .06, m - r * .45 + i * r * .42, r * .09, 0, TAU); g.fill(); }
+    if (buttons) for (let i = 0; i < 3; i++) coal(m + r * .06, m - r * .48 + i * r * .42, r * .1);
     return (cache[key] = { c, size: S / DPR });
   }
+
   // Antarctic mountains: fractal ridges, snow fields shaded by slope, rocky couloirs and haze
   function mountains(L, baseY, amp, seed, o) {
     const g = L.g, R = mulberry32(seed), nz = makeNoise(R), x0 = -M - 6, x1 = W + M + 6, step = 2, n = Math.ceil((x1 - x0) / step) + 1;
@@ -1791,7 +1801,7 @@
     const ds = Math.min(1.3, H / 800);
     const deer = [{ x: W * .05, buck: 1, flip: 1, s: .78 }, { x: W * .115, buck: 0, flip: -1, s: .7 }]
       .map(d => ({ ...d, y: fy(d.x) + 10 * ds, s: d.s * ds, head: 0, ph: R() * TAU, alert: 0 }));
-    const smX = W * .16, sman = { x: smX, y: dfy(smX) + 28 * ds, h: clamp(Math.min(W, H) * .15, 46, 92) };
+    const smX = W * .16, sman = { x: smX, y: dfy(smX) + 28 * ds, h: clamp(Math.min(W, H) * .22, 60, 130) };
     const pgs = clamp(Math.min(W, H) / 400, .9, 1.5); // a penguin couple, in the snow in front
     const pengs = [{ home: W * .335, hat: 1 }, { home: W * .335 + 27 * pgs, scarf: 1 }].map(p => ({ ...p, y: dfy(p.home) + 20 * ds, s: pgs }));
     return { far0, far, near, field, front, fy, dfy, forest, cab, lanterns, pathLights, deer, sman, pengs };
@@ -2187,6 +2197,18 @@
         ctx.globalAlpha = .2 * on * fl; ctx.drawImage(pool(), wx - wd.w * 1.7, C.y - 3, wd.w * 3.4, 8);
         ctx.globalCompositeOperation = "source-over";
       });
+      if (t > T_CABIN + 1.6 && C.roof) { // coloured lights strung along the roof
+        ctx.globalCompositeOperation = "lighter";
+        const [L, Tp, Rt] = C.roof;
+        for (const [A, B, side] of [[L, Tp, 0], [Tp, Rt, 1]]) for (let i = 0; i <= 8; i++) {
+          const j = side * 9 + i, f = i / 8, bx = C.x + A[0] + (B[0] - A[0]) * f, by = C.y + A[1] + (B[1] - A[1]) * f + 1.4 + Math.sin(f * Math.PI * 8) * .6;
+          const on = clamp((t - T_CABIN - 1.6 - j * .05) / .2) * k, tw = .65 + .35 * Math.sin(t * 2.6 - j * .8), cl = BULB_C[j % 5];
+          glow(cl, bx, by, 6.5, .42 * on * tw);
+          ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = on * (.55 + .45 * tw); ctx.fillStyle = `rgb(${BULB_RGB[cl]})`;
+          ctx.beginPath(); ctx.arc(bx, by, 1.5, 0, TAU); ctx.fill(); ctx.globalCompositeOperation = "lighter";
+        }
+        ctx.globalCompositeOperation = "source-over";
+      }
       if (t > T_CABIN + 1.4 && Math.random() < dt * 7) this.smoke.push({ x: C.x + C.chim.x + rand(-1, 1), y: C.y + C.chim.y, vx: rand(1, 4), vy: rand(-15, -9), s: rand(1.6, 3), life: 1 });
       const img = soft();
       for (let i = this.smoke.length - 1; i >= 0; i--) {
@@ -2252,36 +2274,58 @@
       const roll = (1 - k0) * 70, B1 = snowBall(r1, 0, 0);
       ctx.save(); ctx.translate(bx - roll, c1y); ctx.rotate(-roll / r1); ctx.globalAlpha = Math.min(1, k0 * 2); ctx.drawImage(B1.c, -B1.size / 2, -B1.size / 2, B1.size, B1.size); ctx.restore();
       if (k1 > 0) { const B2 = snowBall(r2, 0, 1); ctx.globalAlpha = Math.min(1, k1 * 3); ctx.drawImage(B2.c, bx - B2.size / 2, c2y + drop(k1, 70) - B2.size / 2, B2.size, B2.size); }
-      if (k5 > 0) { // stick arms; the right one waves at the tree
+      if (k5 > 0) { // twig arms in red mittens; the right one waves at the tree
         const fast = this.smWave > 0, wave = Math.sin(t * (fast ? 9 : 2.2)) * (fast ? .5 : .18);
-        ctx.globalAlpha = 1; ctx.strokeStyle = "#3b2618"; ctx.lineCap = "round"; ctx.lineWidth = Math.max(1.2, h * .022);
+        ctx.globalAlpha = 1; ctx.lineCap = "round";
         const arm = (sx, sy, ang, len) => {
-          const ex = sx + Math.cos(ang) * len, ey = sy + Math.sin(ang) * len, mx = sx + Math.cos(ang) * len * .65, my = sy + Math.sin(ang) * len * .65;
-          ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey);
-          ctx.moveTo(mx, my); ctx.lineTo(mx + Math.cos(ang - .7) * len * .3, my + Math.sin(ang - .7) * len * .3);
-          ctx.moveTo(ex, ey); ctx.lineTo(ex + Math.cos(ang + .5) * len * .2, ey + Math.sin(ang + .5) * len * .2); ctx.stroke();
+          const ex = sx + Math.cos(ang) * len, ey = sy + Math.sin(ang) * len, mx = sx + Math.cos(ang) * len * .6, my = sy + Math.sin(ang) * len * .6;
+          ctx.strokeStyle = "#3b2618"; ctx.lineWidth = Math.max(1.2, h * .022);
+          ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.moveTo(mx, my); ctx.lineTo(mx + Math.cos(ang - .7) * len * .3, my + Math.sin(ang - .7) * len * .3); ctx.stroke();
+          if (k5 > .6) {
+            const mr = h * .04 * Math.min(1, (k5 - .6) / .4);
+            ctx.fillStyle = "#f3f5fb"; ctx.beginPath(); ctx.ellipse(ex - Math.cos(ang) * mr * .9, ey - Math.sin(ang) * mr * .9, mr * .45, mr * .85, ang, 0, TAU); ctx.fill();
+            ctx.fillStyle = "#b3122a"; ctx.beginPath(); ctx.ellipse(ex, ey, mr * 1.1, mr * .85, ang, 0, TAU); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(ex + Math.cos(ang - 1.3) * mr * .8, ey + Math.sin(ang - 1.3) * mr * .8, mr * .45, mr * .3, ang - 1.3, 0, TAU); ctx.fill();
+          }
         };
         arm(bx - r2 * .85, c2y - r2 * .1, Math.PI + .5, h * .32 * k5);
         arm(bx + r2 * .85, c2y - r2 * .1, -.6 + wave, h * .32 * k5);
       }
       if (k2 > 0) { const B3 = snowBall(r3, 1, 0); ctx.globalAlpha = Math.min(1, k2 * 3); ctx.drawImage(B3.c, bx - B3.size / 2, c3y + drop(k2, 80) - B3.size / 2, B3.size, B3.size); }
-      if (k3 > 0) { ctx.globalAlpha = 1; ctx.fillStyle = "#e07a2e"; ctx.beginPath(); ctx.moveTo(bx + r3 * .1, c3y - r3 * .02); ctx.lineTo(bx + r3 * .1 + r3 * .85 * k3, c3y + r3 * .1); ctx.lineTo(bx + r3 * .1, c3y + r3 * .2); ctx.closePath(); ctx.fill(); }
+      if (k3 > 0) { // a carrot nose
+        const nl = r3 * .85 * k3, nx = bx + r3 * .12, ny = c3y + r3 * .04, cg = ctx.createLinearGradient(0, ny - r3 * .12, 0, ny + r3 * .12);
+        cg.addColorStop(0, "#ffa24c"); cg.addColorStop(1, "#c2581a");
+        ctx.globalAlpha = 1; ctx.fillStyle = cg; ctx.beginPath(); ctx.moveTo(nx, ny - r3 * .12); ctx.quadraticCurveTo(nx + nl * .6, ny - r3 * .05, nx + nl, ny + r3 * .03); ctx.quadraticCurveTo(nx + nl * .6, ny + r3 * .08, nx, ny + r3 * .13); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = "rgba(120,50,10,.6)"; ctx.lineWidth = Math.max(.6, r3 * .03); ctx.beginPath();
+        for (const f of [.3, .5, .7]) { ctx.moveTo(nx + nl * f, ny - r3 * .09 * (1 - f) - .3); ctx.lineTo(nx + nl * f + .8, ny + r3 * .1 * (1 - f) + .3); }
+        ctx.stroke();
+      }
       if (k4 > 0) { // scarf, fluttering in the wind
         const fl = Math.sin(t * 3) * .1 + GUST * .5, sy = c3y + r3 * .82;
-        ctx.globalAlpha = k4; ctx.fillStyle = "#8e1b2c";
-        ctx.beginPath(); ctx.ellipse(bx, sy, r3 * 1.02, r3 * .26, 0, 0, TAU); ctx.fill();
-        ctx.save(); ctx.translate(bx - r3 * .55, sy); ctx.rotate(.15 + fl);
-        ctx.fillRect(-r3 * .18, 0, r3 * .36, r3 * 1.1 * k4);
-        ctx.fillStyle = "#c9a463"; ctx.fillRect(-r3 * .18, r3 * .55 * k4, r3 * .36, r3 * .12);
+        const sw = r3 * 1.06, sg = ctx.createLinearGradient(0, sy - r3 * .26, 0, sy + r3 * .26); sg.addColorStop(0, "#c42236"); sg.addColorStop(1, "#7a0e1e");
+        ctx.globalAlpha = k4; ctx.fillStyle = sg; ctx.beginPath(); ctx.ellipse(bx, sy, sw, r3 * .28, 0, 0, TAU); ctx.fill();
+        ctx.strokeStyle = "rgba(255,230,200,.55)"; ctx.lineWidth = Math.max(.6, r3 * .05); ctx.beginPath();
+        for (const f of [-.6, -.2, .2, .6]) { ctx.moveTo(bx + sw * f, sy - r3 * .22); ctx.lineTo(bx + sw * f + r3 * .04, sy + r3 * .22); }
+        ctx.stroke();
+        ctx.save(); ctx.translate(bx - r3 * .55, sy + r3 * .08); ctx.rotate(.15 + fl);
+        const tl = r3 * 1.2 * k4; ctx.fillStyle = sg; ctx.fillRect(-r3 * .2, 0, r3 * .4, tl);
+        ctx.fillStyle = "#f1e6cf"; for (const f of [.3, .55, .8]) ctx.fillRect(-r3 * .2, tl * f, r3 * .4, r3 * .09);
+        ctx.strokeStyle = "#c42236"; ctx.lineWidth = Math.max(.6, r3 * .045); ctx.beginPath();
+        for (let i = 0; i < 4; i++) { const fx = -r3 * .16 + i * r3 * .107; ctx.moveTo(fx, tl); ctx.lineTo(fx + Math.sin(t * 3 + i) * r3 * .03, tl + r3 * .18); }
+        ctx.stroke();
         ctx.restore();
       }
       if (k6 > 0) { // top hat lands with a little bounce
         const hy = c3y - r3 * .78 + (k6 < .7 ? -(1 - k6 / .7) * 60 : -Math.sin((k6 - .7) / .3 * Math.PI) * 4) + this.smHat;
         ctx.save(); ctx.translate(bx + r3 * .05, hy); ctx.rotate(-.12); ctx.globalAlpha = Math.min(1, k6 * 3);
         ctx.fillStyle = "#121318"; ctx.beginPath(); ctx.ellipse(0, 0, r3 * 1.05, r3 * .2, 0, 0, TAU); ctx.fill();
-        ctx.fillRect(-r3 * .62, -r3 * .95, r3 * 1.24, r3 * .95);
-        ctx.fillStyle = "#8e1b2c"; ctx.fillRect(-r3 * .62, -r3 * .32, r3 * 1.24, r3 * .2);
-        ctx.fillStyle = "rgba(230,236,255,.85)"; ctx.beginPath(); ctx.ellipse(-r3 * .1, -r3 * .97, r3 * .5, r3 * .1, 0, 0, TAU); ctx.fill();
+        const hg = ctx.createLinearGradient(-r3 * .62, 0, r3 * .62, 0); hg.addColorStop(0, "#363946"); hg.addColorStop(.3, "#17181f"); hg.addColorStop(1, "#07070a");
+        ctx.fillStyle = hg; ctx.fillRect(-r3 * .62, -r3 * .95, r3 * 1.24, r3 * .95);
+        ctx.fillStyle = "#2b2d37"; ctx.beginPath(); ctx.ellipse(0, -r3 * .95, r3 * .62, r3 * .12, 0, 0, TAU); ctx.fill();
+        ctx.fillStyle = "#b3122a"; ctx.fillRect(-r3 * .62, -r3 * .32, r3 * 1.24, r3 * .2);
+        ctx.fillStyle = "#2f7a3a"; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.ellipse(r3 * .32 + sd * r3 * .13, -r3 * .26, r3 * .15, r3 * .065, sd * .5, 0, TAU); ctx.fill(); }
+        ctx.fillStyle = "#e0233c"; for (const [dx, dy] of [[.3, -.3], [.38, -.2]]) { ctx.beginPath(); ctx.arc(r3 * dx, r3 * dy, r3 * .06, 0, TAU); ctx.fill(); }
+        ctx.fillStyle = "rgba(235,240,255,.9)"; ctx.beginPath(); ctx.ellipse(-r3 * .1, -r3 * .99, r3 * .5, r3 * .1, 0, 0, TAU); ctx.fill();
         ctx.restore();
       }
       this.smWave = Math.max(0, this.smWave - dt);
@@ -2798,7 +2842,7 @@
         const S0 = sc.fwShow;
         [[.22, .42, 0], [.78, .38, .7], [.4, .3, 1.5], [.64, .45, 2.1], [.15, .3, 2.9], [.86, .29, 3.6], [.5, .33, 4.9, "heart"], [.5, .35, 9, "text"]].forEach(([xn, yn, d, kind], i) =>
           this.once("fw" + i, S0 + d, () => { const [wx, wy] = toWorld(W * xn, H * yn, FW_D); launchFirework(wx, wy, kind); }));
-        this.once("fwhny", S0 + 14.6, () => { sc.lower = 0; sc.waveT = this.t + 3.6; sc.relower = this.t + 5.6; this.say(["Ho ho ho!", "Happy New Year, Akari!"], 4); });
+        this.once("fwhny", S0 + 14.6, () => { sc.lower = 0; sc.waveT = this.t + 3.6; sc.relower = this.t + 5.6; this.say(["Ho ho ho!", "Happy New Year, Akari!"], 4); playWish(); });
         if (t > sc.nextFw) { sc.nextFw = t + rand(18, 30); const [wx, wy] = toWorld(W * rand(.15, .85), H * rand(.28, .46), FW_D); launchFirework(wx, wy); }
       }
       if (sc.cardAt && t > sc.cardAt) { sc.cardAt = 0; showCard(); if (sfx) softChord([261.63, 329.63, 392, 493.88], actx.currentTime, 4, .02, sfx); }
@@ -3057,8 +3101,15 @@
     ["F5", 2], ["F5", 2], ["F5", 2], ["F5", 2], ["F5", 2], ["E5", 2], ["E5", 2], ["E5", 1], ["E5", 1], ["G5", 2], ["G5", 2], ["F5", 2], ["D5", 2], ["C5", 8]
   ];
   const JB_BARS = "CCCCFCGGCCCCFCGC";
-  const FQ = { C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880, B5: 987.77, C6: 1046.5, D6: 1174.66, E6: 1318.51, F6: 1396.91 };
-  const CHD = { C: [130.81, 164.81, 196], G: [98, 123.47, 146.83], F: [87.31, 110, 130.81] };
+  const FQ = { C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880, B5: 987.77, C6: 1046.5, D6: 1174.66, E6: 1318.51, F6: 1396.91, Fs5: 739.99 };
+  const CHD = { C: [130.81, 164.81, 196], G: [98, 123.47, 146.83], F: [87.31, 110, 130.81], D: [146.83, 185, 220], A: [110, 138.59, 164.81] };
+  // "We Wish You a Merry Christmas" (traditional English carol) — public domain. For Santa's New Year wish.
+  const WW = [["D5", 2],
+    ["G5", 2], ["G5", 1], ["A5", 1], ["G5", 1], ["Fs5", 1], ["E5", 2], ["E5", 2], ["E5", 2],
+    ["A5", 2], ["A5", 1], ["B5", 1], ["A5", 1], ["G5", 1], ["Fs5", 2], ["D5", 2], ["D5", 2],
+    ["B5", 2], ["B5", 1], ["C6", 1], ["B5", 1], ["A5", 1], ["G5", 2], ["E5", 2], ["D5", 1], ["D5", 1],
+    ["E5", 2], ["A5", 2], ["Fs5", 2], ["G5", 6]];
+  const WW_BARS = "GCADGCDG";
   let actx = null, master = null, sfx = null, verb = null, playing = false, resumeMusic = false, loopTimer = null, windNode = null;
   function audio() {
     if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
@@ -3144,6 +3195,23 @@
   function stopMusic() {
     playing = false; clearTimeout(loopTimer);
     if (master) { const old = master; old.gain.setTargetAtTime(0, actx.currentTime, .06); setTimeout(() => old.disconnect(), 500); master = null; }
+  }
+  function playWish() { // the music box plays "We Wish You a Merry Christmas" twice, then goes back to Silent Night
+    if (!sfx || document.hidden) return;
+    stopMusic();
+    setTimeout(() => {
+      if (document.hidden || playing) return;
+      master = actx.createGain(); master.gain.value = .5; master.connect(actx.destination); master.connect(verb);
+      playing = true;
+      const e = .19, start = actx.currentTime + .08; let when = start;
+      for (let rep = 0; rep < 2; rep++) for (const [n, d] of WW) { bell(FQ[n], when, Math.min(d * e, .9), .11, master); when += d * e; }
+      const half = (when - start) / 2;
+      for (let rep = 0; rep < 2; rep++) for (let b = 0; b < WW_BARS.length; b++) {
+        const ch = CHD[WW_BARS[b]], tb = start + rep * half + 2 * e + b * 6 * e;
+        bell(ch[0], tb, .6, .045, master); bell(ch[1] * 2, tb + 2 * e, .2, .016, master); bell(ch[2] * 2, tb + 4 * e, .2, .016, master);
+      }
+      clearTimeout(loopTimer); loopTimer = setTimeout(() => playing && loop(), (when - start) * 1000 + 900);
+    }, 650);
   }
   function playJingle() { // Santa's arrival: a music-box Jingle Bells, then back to Silent Night
     if (!sfx || document.hidden) return;
