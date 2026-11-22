@@ -1398,15 +1398,19 @@
   ];
   function drawAurora(t, A) {
     ctx.globalCompositeOperation = "lighter";
-    const step = 4, pulse = .85 + .15 * Math.sin(t * .45);
+    const step = 4, pulse = (.85 + .15 * Math.sin(t * .45)) * (1 + .14 * musicPulse());
+    const WV = musicWaves(auroraWaves), nw = WV.length;
     for (const r of AUR) {
       for (let x = -M; x < W + M; x += step) {
         const xn = x / W;
+        let boost = 0; // each music-box note sends ripples of light out along the curtain from above the star
+        for (let j = 0; j < nw; j++) { const d = WV[j], a = (1 - Math.exp(-d * 8)) * Math.exp(-d * 1.15), q1 = (xn - .5 - d * .5) / .11, q2 = (xn - .5 + d * .5) / .11; boost += a * (Math.exp(-q1 * q1) + Math.exp(-q2 * q2)); }
+        boost = Math.min(1.3, boost);
         const by = H * (r.y - .07 * (xn - .5) + .045 * Math.sin(xn * 2.2 + t * .16 * r.sp + r.ph) + .02 * Math.sin(xn * 5.3 - t * .27 * r.sp + r.ph * 2));
-        const hh = H * r.h * (.55 + .45 * (.5 + .5 * Math.sin(xn * 3.1 + t * .17 + r.ph)));
+        const hh = H * r.h * (.55 + .45 * (.5 + .5 * Math.sin(xn * 3.1 + t * .17 + r.ph))) * (1 + .14 * boost);
         const rays = (.6 + .4 * Math.sin(xn * 21 + t * .55 * r.sp + Math.sin(xn * 7 + t * .22) * 1.8)) * (.86 + .14 * Math.sin(xn * 63 + t * 1.1));
         const env = .35 + .65 * (.5 + .5 * Math.sin(xn * 4.2 - t * .25 + r.ph * 1.7));
-        ctx.globalAlpha = A * r.a * .62 * rays * env * pulse;
+        ctx.globalAlpha = A * r.a * .62 * rays * env * pulse * (1 + .8 * boost);
         ctx.drawImage(r.s, 0, 0, 8, 256, x - step * .7, by - hh, step * 2.4, hh);
       }
     }
@@ -1642,31 +1646,59 @@
     }
     c.restore();
   }
-  function drawDeer(s, buck, head, ear, tail, alpha) { // standing deer, facing right, feet at y = 13
-    ctx.save(); ctx.scale(s, s); ctx.globalAlpha = alpha;
-    ctx.fillStyle = ctx.strokeStyle = "#0c1024"; ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.lineWidth = 1.6; ctx.beginPath();
+  function drawDeer(s, buck, head, ear, tail, alpha) { // a reindeer at the forest edge, facing right, feet at y = 13
+    ctx.save(); ctx.scale(s, s); ctx.globalAlpha = alpha; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = "#3a2516"; ctx.lineWidth = 1.7; ctx.beginPath();
     ctx.moveTo(8, 1); ctx.lineTo(8.6, 7); ctx.lineTo(8.2, 13);
     ctx.moveTo(6, 1.5); ctx.lineTo(5.8, 7.5); ctx.lineTo(6.4, 13);
     ctx.moveTo(-9, 0); ctx.lineTo(-10.5, 6); ctx.lineTo(-9.4, 13);
     ctx.moveTo(-11, -.5); ctx.lineTo(-12.2, 6); ctx.lineTo(-11.6, 13);
     ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-14, -2);
+    ctx.fillStyle = "#16100c"; for (const hx of [8.2, 6.4, -9.4, -11.6]) { ctx.beginPath(); ctx.ellipse(hx, 13, 1.3, .7, 0, 0, TAU); ctx.fill(); }
+    let g = ctx.createLinearGradient(0, -9, 0, 4); g.addColorStop(0, "#7a5233"); g.addColorStop(.55, "#53351f"); g.addColorStop(1, "#2e1d11");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(-14, -2);
     ctx.bezierCurveTo(-12, -8, 2, -9, 9, -6); ctx.bezierCurveTo(12, -5, 13, -1, 11, 2);
     ctx.bezierCurveTo(5, 4, -7, 4, -12, 2); ctx.bezierCurveTo(-14.5, 1, -15, -1, -14, -2); ctx.fill();
-    ctx.save(); ctx.translate(-14, -3); ctx.rotate(-.4 + tail * .6); ctx.beginPath(); ctx.ellipse(-1.5, 0, 2.2, 1.1, 0, 0, TAU); ctx.fill(); ctx.restore();
+    g = ctx.createLinearGradient(0, -1, 0, 3.4); g.addColorStop(0, "rgba(214,190,150,0)"); g.addColorStop(1, "rgba(214,190,150,.5)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(-1.5, 1.6, 8.6, 2.1, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = "#efe6d8"; ctx.beginPath(); ctx.ellipse(-13, -1.8, 2.2, 2.8, 0, 0, TAU); ctx.fill();
+    ctx.save(); ctx.translate(-14, -3); ctx.rotate(-.4 + tail * .6); ctx.fillStyle = "#f6efe4"; ctx.beginPath(); ctx.ellipse(-1.5, 0, 2.2, 1.1, 0, 0, TAU); ctx.fill(); ctx.restore();
+    ctx.strokeStyle = "rgba(205,220,255,.38)"; ctx.lineWidth = .8; ctx.beginPath(); ctx.moveTo(-12, -5.5); ctx.bezierCurveTo(-6, -8.4, 2, -8.6, 8.5, -6.2); ctx.stroke();
     ctx.save(); ctx.translate(9, -5); ctx.rotate(head);
-    ctx.beginPath(); ctx.moveTo(-2.5, 1); ctx.lineTo(1.5, -9); ctx.lineTo(5, -10.5); ctx.lineTo(3.5, 1.5); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(1, -10); ctx.bezierCurveTo(4, -12.5, 8, -12, 10.5, -10); ctx.lineTo(10, -8.6); ctx.bezierCurveTo(7.5, -8.3, 5, -8, 3.2, -7.4); ctx.closePath(); ctx.fill();
-    ctx.save(); ctx.translate(2.4, -11.4); ctx.rotate(-.7 + ear * .45); ctx.beginPath(); ctx.ellipse(-2.2, 0, 2.6, 1.1, 0, 0, TAU); ctx.fill(); ctx.restore();
+    g = ctx.createLinearGradient(0, -11, 0, 2); g.addColorStop(0, "#6e4a2c"); g.addColorStop(1, "#3a2516");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(-2.5, 1); ctx.lineTo(1.5, -9); ctx.lineTo(5, -10.5); ctx.lineTo(3.5, 1.5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(236,226,206,.82)"; ctx.beginPath(); ctx.moveTo(.4, -7); // the shaggy pale mane under the throat
+    ctx.quadraticCurveTo(3.2, -5, 3.4, -1.6); ctx.lineTo(2.6, -.6); ctx.lineTo(2.9, .6); ctx.lineTo(1.6, .2); ctx.lineTo(1.2, 1.4); ctx.lineTo(.2, .4); ctx.lineTo(-.9, 1.2);
+    ctx.quadraticCurveTo(-.6, -3.6, .4, -7); ctx.fill();
+    ctx.fillStyle = "#5a3a22"; ctx.beginPath(); ctx.moveTo(1, -10); ctx.bezierCurveTo(4, -12.5, 8, -12, 10.5, -10); ctx.lineTo(10, -8.6); ctx.bezierCurveTo(7.5, -8.3, 5, -8, 3.2, -7.4); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#2a1a10"; ctx.beginPath(); ctx.ellipse(9.6, -9.2, 1.6, 1.1, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = "#0e0a08"; ctx.beginPath(); ctx.arc(5, -10.4, .6, 0, TAU); ctx.fill();
+    ctx.save(); ctx.translate(2.4, -11.4); ctx.rotate(-.7 + ear * .45); ctx.fillStyle = "#4a2f1c"; ctx.beginPath(); ctx.ellipse(-2.2, 0, 2.6, 1.1, 0, 0, TAU); ctx.fill(); ctx.restore();
+    ctx.strokeStyle = "#d9c69c"; ctx.lineWidth = 1; ctx.beginPath();
     if (buck) {
-      ctx.lineWidth = 1; ctx.beginPath();
       ctx.moveTo(3, -12); ctx.quadraticCurveTo(1.5, -17, -2.5, -19.5); ctx.moveTo(1.6, -15.5); ctx.lineTo(4, -18); ctx.moveTo(.2, -17.8); ctx.lineTo(.6, -21);
       ctx.moveTo(4.2, -11.8); ctx.quadraticCurveTo(5.5, -16.5, 3.8, -20); ctx.moveTo(5, -15.2); ctx.lineTo(7.4, -17.4);
-      ctx.stroke();
-    }
+    } else { ctx.moveTo(3, -12); ctx.quadraticCurveTo(2.5, -15, .5, -16.5); ctx.moveTo(4.2, -11.8); ctx.quadraticCurveTo(5, -14.5, 4, -16.5); }
+    ctx.stroke();
     ctx.restore(); ctx.restore();
   }
+  function drawRobin(flap, peck, face) { // a little robin, feet at (0, 0), facing right when face = 1
+    const c = ctx; c.save(); c.scale(face, 1);
+    c.strokeStyle = "#7a5a3a"; c.lineWidth = .6; c.beginPath(); c.moveTo(-1, -2.4); c.lineTo(-1.2, 0); c.moveTo(1, -2.4); c.lineTo(1.1, 0); c.stroke();
+    c.fillStyle = "#4a3324"; c.beginPath(); c.moveTo(-4, -5.5); c.lineTo(-8.5, -7.5); c.lineTo(-7.8, -4.6); c.closePath(); c.fill();
+    const g = c.createRadialGradient(-1, -7, .5, 0, -5.5, 5); g.addColorStop(0, "#8a6446"); g.addColorStop(1, "#4a3324");
+    c.fillStyle = g; c.beginPath(); c.ellipse(0, -5.4, 4.6, 3.6, -.15, 0, TAU); c.fill();
+    c.fillStyle = "#e0602e"; c.beginPath(); c.ellipse(1.8, -4.8, 2.6, 2.7, .3, 0, TAU); c.fill();
+    c.save(); c.translate(2.8, -8.2 + peck * 2.4); c.rotate(peck * .6);
+    c.fillStyle = "#5a3f2b"; c.beginPath(); c.arc(0, 0, 2.6, 0, TAU); c.fill();
+    c.fillStyle = "#e0602e"; c.beginPath(); c.arc(.9, 1.2, 1.5, 0, TAU); c.fill();
+    c.fillStyle = "#e8b04a"; c.beginPath(); c.moveTo(2.3, -.3); c.lineTo(4.2, .2); c.lineTo(2.3, .8); c.closePath(); c.fill();
+    c.fillStyle = "#111"; c.beginPath(); c.arc(1.1, -.6, .5, 0, TAU); c.fill(); c.fillStyle = "#fff"; c.beginPath(); c.arc(1.25, -.75, .18, 0, TAU); c.fill();
+    c.restore();
+    c.fillStyle = "#3e2a1d"; c.save(); c.translate(-1, -6.4); c.rotate(-.2 - flap * 1.1); c.beginPath(); c.ellipse(-1.6, 0, 3.4, 1.7, 0, 0, TAU); c.fill(); c.restore();
+    c.restore();
+  }
+
   function snowBall(r, face, buttons) { // packed snow: lumpy, shaded, frosted; coal eyes, rosy cheeks and a coal smile
     const key = `sb2${Math.round(r * DPR)}${face ? "f" : ""}${buttons ? "b" : ""}`;
     if (cache[key]) return cache[key];
@@ -2058,7 +2090,7 @@
       this.shake = this.shakeV = 0; this.fly = null; this.nextFly = Infinity; this.crystT = 9; this.nextGust = T_DONE + 7;
       this.sc = { gift: "held", tGive: -1, tOpen: -1, tClose: -1, waveT: 0, lower: 0, low: 0, bub: null, talk: 0, blink: 0, rect: null, gpos: null, breath: [], nextBreath: 0, laughT: 0, twT: 0 };
       this.hearts = []; fw = []; fwRockets = []; fwFlash = []; fwText = [];
-      this.notes = []; this.noteI = 0; this.bloomT = 0; this.roots = null; this.showT = 0; this.nextShow = T_DONE + 8; this.tsmoke = []; this.trainPos = null; this.trainPuff = 0; this.pg = { next: T_SNOWMAN + 17, kiss: -9, kh: true, hop: -9, hearts: [] };
+      this.notes = []; this.noteI = 0; this.bloomT = 0; this.roots = null; this.showT = 0; this.nextShow = T_DONE + 8; this.rb = null; this.tsmoke = []; this.trainPos = null; this.trainPuff = 0; this.pg = { next: T_SNOWMAN + 17, kiss: -9, kh: true, hop: -9, hearts: [] };
       document.body.classList.remove("p-text");
       hideHint(); hideCard(); hintEl.classList.remove("side");
     },
@@ -2336,6 +2368,37 @@
         ctx.drawImage(soft(), p.x + u * 14 * p.s - r, p.y - u * 22 * p.s - r, r * 2, r * 2);
       }
       this.once("trainToot", t0 + 1.6, () => toot());
+      ctx.globalAlpha = 1;
+    },
+    robinHome() { // where the robin hops, and the top of the snowman's hat where it likes to sit
+      const Sm = this.world.sman, ds = Math.min(1.3, H / 800), h = Sm.h, r1 = h * .2, r2 = h * .15, r3 = h * .11;
+      const c3y = Sm.y - r1 * .96 - r1 * .9 - r2 * .78 - r2 * .85 - r3 * .8;
+      return { ds, x0: Sm.x + 24 * ds, x1: Sm.x + 52 * ds, gy: x => this.world.dfy(x) + 24 * ds, hat: [Sm.x + r3 * .05, c3y - r3 * 1.73 - .5] };
+    },
+    robinFly(t, to, land) { const R = this.rb; R.fly = { t0: t, from: [R.x, R.y], to, d: 1.1 }; R.st = "fly"; R.land = land; R.face = to[0] > R.x ? 1 : -1; chirp(); },
+    drawRobin(t, dt) { // a robin hops and pecks in the snow by the snowman, and now and then sits on his hat
+      const t0 = T_SNOWMAN + 6; if (t < t0) return;
+      const Hm = this.robinHome(), ds = Hm.ds;
+      const R = this.rb || (this.rb = { x: Hm.x0 + 10 * ds, y: Hm.gy(Hm.x0 + 10 * ds), face: -1, st: "ground", tNext: t + .8, hop: null, peckT: -9, perchAt: t + 9, leaveAt: 0 });
+      let flap = 0, peck = 0, yo = 0;
+      if (R.st === "ground") {
+        if (t > R.perchAt) this.robinFly(t, Hm.hat, "perch");
+        else if (t > R.tNext && !R.hop) {
+          if (Math.random() < .6) { const nx = clamp(R.x + rand(-14, 14) * ds, Hm.x0, Hm.x1); R.hop = { t0: t, x0: R.x, x1: nx }; R.face = nx > R.x ? 1 : -1; }
+          else R.peckT = t;
+          R.tNext = t + rand(.5, 1.3);
+        }
+        if (R.hop) { const f = clamp((t - R.hop.t0) / .28); R.x = R.hop.x0 + (R.hop.x1 - R.hop.x0) * f; yo = -Math.sin(f * Math.PI) * 6 * ds; flap = Math.sin(f * Math.PI) * .5; if (f >= 1) R.hop = null; R.y = Hm.gy(R.x); }
+        peck = Math.max(0, Math.sin(clamp((t - R.peckT) / .4) * Math.PI));
+      } else if (R.st === "fly") {
+        const F = R.fly, f = easeIO(clamp((t - F.t0) / F.d)), m = 1 - f, cxp = (F.from[0] + F.to[0]) / 2, cyp = Math.min(F.from[1], F.to[1]) - 26 * ds;
+        R.x = m * m * F.from[0] + 2 * m * f * cxp + f * f * F.to[0]; R.y = m * m * F.from[1] + 2 * m * f * cyp + f * f * F.to[1]; flap = Math.abs(Math.sin(t * 30));
+        if (f >= 1) { if (R.land === "perch") { R.st = "perch"; R.leaveAt = t + rand(5, 7); } else { R.st = "ground"; R.perchAt = t + rand(10, 16); R.tNext = t + .5; } }
+      } else { // sitting on the hat, looking around
+        R.x = Hm.hat[0]; R.y = Hm.hat[1] + this.smHat; if (Math.sin(t * 1.3) > .97) R.face = -R.face;
+        if (t > R.leaveAt) { const nx = rand(Hm.x0, Hm.x1); this.robinFly(t, [nx, Hm.gy(nx)], "ground"); }
+      }
+      ctx.save(); ctx.translate(R.x, R.y + yo); ctx.scale(1.1 * ds, 1.1 * ds); ctx.globalAlpha = clamp((t - t0) / .6); drawRobin(flap, peck, R.face); ctx.restore();
       ctx.globalAlpha = 1;
     },
     drawPenguins(t, dt) { // the penguin couple waddles in, then stays close; now and then a little heart
@@ -2733,7 +2796,7 @@
         }
         ctx.globalCompositeOperation = "source-over";
       }
-      view(1.25); this.drawSnowHeart(t); this.drawSnowman(t, dt); this.drawPenguins(t, dt);
+      view(1.25); this.drawSnowHeart(t); this.drawSnowman(t, dt); this.drawPenguins(t, dt); this.drawRobin(t, dt);
       const smP = (dx, dy) => toWorld(...screenOf(this.world.sman.x + dx, this.world.sman.y + dy, 1.25), 1);
       this.once("sm0", T_SNOWMAN, () => whoosh(.9, .12));
       this.once("sm1", T_SNOWMAN + 1.25, () => { ping(523, .05); const [px, py] = smP(0, -this.world.sman.h * .45); snowPuff(px, py, 8, .6); });
@@ -3112,6 +3175,10 @@
         if (Math.abs(x - gf.x) < gf.bw * .6 + 6 && y < gf.y + 8 && y > gf.y - gf.bh - 16) { gf.hv = -260; burst(gf.x, gf.y - gf.bh, 14, "gold"); ping(gf.note); return; }
       }
       const Sm = this.world.sman, [smx, smy] = toWorld(sx0, sy0, 1.25);
+      if (this.rb && Math.hypot(smx - this.rb.x, smy - (this.rb.y - 5)) < 16) { // tap the robin: it flies up to the hat, or flutters if it is already there
+        if (this.rb.st === "ground") this.robinFly(t, this.robinHome().hat, "perch"); else chirp();
+        return;
+      }
       if (t > T_SNOWMAN + 3 && Math.abs(smx - Sm.x) < Sm.h * .32 && smy < Sm.y + 4 && smy > Sm.y - Sm.h * 1.05) {
         this.smWave = 2.4; this.smHatV = -240; chime(.05); burst(x, y, 12, "gold"); return;
       }
@@ -3220,6 +3287,23 @@
     ["E5", 2], ["A5", 2], ["Fs5", 2], ["G5", 6]];
   const WW_BARS = "GCADGCDG";
   let actx = null, master = null, sfx = null, verb = null, playing = false, resumeMusic = false, loopTimer = null, windNode = null;
+  let noteT = []; // when the music box plays each melody note (audio clock), so the northern lights can glow along
+  function addNote(w) { noteT.push(w); if (noteT.length > 200) noteT = noteT.slice(-120); }
+  function musicPulse() {
+    if (!actx || !playing) return 0;
+    const now = actx.currentTime; let p = 0;
+    for (let i = noteT.length - 1; i >= 0; i--) { const d = now - noteT[i]; if (d < 0) continue; if (d > 1.2) break; p = Math.max(p, Math.exp(-d * 3.2)); }
+    return p;
+  }
+  const auroraWaves = [];
+  function musicWaves(out) { // how long ago each note of the last 2.4 s was played
+    out.length = 0;
+    if (!actx || !playing) return out;
+    const now = actx.currentTime;
+    for (let i = noteT.length - 1; i >= 0 && out.length < 8; i--) { const d = now - noteT[i]; if (d < 0) continue; if (d > 2.4) break; out.push(d); }
+    return out;
+  }
+  function chirp() { if (sfx) { const a = actx.currentTime; bell(3136, a, .08, .018, sfx); bell(3520, a + .07, .08, .016, sfx); bell(3951, a + .13, .06, .012, sfx); } }
   function audio() {
     if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
     if (actx.state === "suspended") actx.resume();
@@ -3287,7 +3371,7 @@
   function loop() {
     if (!master) return;
     const e = .24, start = actx.currentTime + .1; let when = start;
-    for (const [n, d] of SN) { bell(FQ[n], when, Math.min(d * e, 1.2), .12, master); when += d * e; }
+    for (const [n, d] of SN) { bell(FQ[n], when, Math.min(d * e, 1.2), .12, master); addNote(when); when += d * e; }
     for (let b = 0; b < SN_BARS.length; b++) {
       const ch = CHD[SN_BARS[b]], tb = start + b * 6 * e;
       bell(ch[0], tb, .9, .045, master);
@@ -3313,7 +3397,7 @@
       master = actx.createGain(); master.gain.value = .5; master.connect(actx.destination); master.connect(verb);
       playing = true;
       const e = .19, start = actx.currentTime + .08; let when = start;
-      for (let rep = 0; rep < 2; rep++) for (const [n, d] of WW) { bell(FQ[n], when, Math.min(d * e, .9), .11, master); when += d * e; }
+      for (let rep = 0; rep < 2; rep++) for (const [n, d] of WW) { bell(FQ[n], when, Math.min(d * e, .9), .11, master); addNote(when); when += d * e; }
       const half = (when - start) / 2;
       for (let rep = 0; rep < 2; rep++) for (let b = 0; b < WW_BARS.length; b++) {
         const ch = CHD[WW_BARS[b]], tb = start + rep * half + 2 * e + b * 6 * e;
@@ -3330,7 +3414,7 @@
       master = actx.createGain(); master.gain.value = .5; master.connect(actx.destination); master.connect(verb);
       playing = true;
       const e = .17, start = actx.currentTime + .08; let when = start;
-      for (const [n, d] of JB) { bell(FQ[n], when, Math.min(d * e, .9), .11, master); when += d * e; }
+      for (const [n, d] of JB) { bell(FQ[n], when, Math.min(d * e, .9), .11, master); addNote(when); when += d * e; }
       for (let b = 0; b < JB_BARS.length; b++) {
         const ch = CHD[JB_BARS[b]], tb = start + b * 8 * e;
         bell(ch[0], tb, .6, .045, master); bell(ch[1] * 2, tb + 2 * e, .2, .016, master); bell(ch[2] * 2, tb + 6 * e, .2, .016, master);
