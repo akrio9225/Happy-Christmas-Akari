@@ -1131,6 +1131,43 @@
     for (let i = 0; i < 4; i++) { rrect(c, -13.5 + i * 6.7, -3.5, 6.3, 11.5 - Math.abs(i - 1.5) * 1.6, 3.1); c.fill(); c.stroke(); }
     c.restore();
   }
+  function drawLoco(t) { // a little red engine with gold trim, facing left; wheels on y = 0
+    const c = ctx;
+    let g = c.createLinearGradient(0, -13, 0, -3); g.addColorStop(0, "#e83c4f"); g.addColorStop(1, "#7a0a1c");
+    c.fillStyle = g; rrect(c, -15, -12.5, 18, 9.5, 4.7); c.fill();
+    c.fillStyle = "#e9c46a"; c.fillRect(-11.5, -12.5, 1.4, 9.5); c.fillRect(-5.5, -12.5, 1.4, 9.5);
+    g = c.createLinearGradient(0, -18, 0, -3); g.addColorStop(0, "#d42a42"); g.addColorStop(1, "#6e0818");
+    c.fillStyle = g; c.fillRect(2, -17, 11, 14);
+    c.fillStyle = "#1a1a22"; c.fillRect(1, -19.5, 13, 2.8); c.fillRect(-12.5, -19, 3.8, 7); c.fillRect(-13.6, -21, 6, 2.2);
+    c.fillStyle = "#ffd48a"; c.fillRect(5, -14.5, 5.5, 5);
+    c.fillStyle = "#e9c46a"; c.beginPath(); c.moveTo(-15, -3.5); c.lineTo(-19.5, 0); c.lineTo(-14, 0); c.closePath(); c.fill();
+    c.fillStyle = "#14141a"; c.fillRect(-16, -4.5, 30, 2.6);
+    for (const wx of [-10, -3.5, 7]) { c.fillStyle = "#14141a"; c.beginPath(); c.arc(wx, -1.2, 2.9, 0, TAU); c.fill(); c.fillStyle = "#e9c46a"; c.beginPath(); c.arc(wx, -1.2, 1, 0, TAU); c.fill(); }
+    const ph = t * 9; c.strokeStyle = "#e9c46a"; c.lineWidth = .9;
+    c.beginPath(); c.moveTo(-10 + Math.cos(ph) * 1.6, -1.2 + Math.sin(ph) * 1.6); c.lineTo(7 + Math.cos(ph) * 1.6, -1.2 + Math.sin(ph) * 1.6); c.stroke();
+    c.fillStyle = "#fff6d8"; c.beginPath(); c.arc(-15.6, -8.5, 1.6, 0, TAU); c.fill();
+    c.fillStyle = "rgba(255,255,255,.35)"; c.fillRect(-13, -11.5, 13, 1.2);
+  }
+  function drawWagon(t, carriage) { // a wagon of presents, or a little green carriage with lit windows; wheels on y = 0
+    const c = ctx;
+    c.strokeStyle = "#14141a"; c.lineWidth = 1.2; c.beginPath(); c.moveTo(-12.5, -3.5); c.lineTo(-15.5, -3.5); c.stroke();
+    if (carriage) {
+      const g = c.createLinearGradient(0, -15, 0, -3); g.addColorStop(0, "#2f8a4c"); g.addColorStop(1, "#14482a");
+      c.fillStyle = g; c.fillRect(-11, -15, 22, 11.5);
+      c.fillStyle = "#1a1a22"; c.fillRect(-12, -17.5, 24, 2.8);
+      c.fillStyle = "#ffd48a"; for (const wx of [-8, -1.5, 5]) c.fillRect(wx, -12.5, 4, 4.5);
+      c.fillStyle = "#e9c46a"; c.fillRect(-11, -5.5, 22, 1.2);
+    } else {
+      c.fillStyle = "#22407a"; c.fillRect(-11, -9.5, 22, 6);
+      c.fillStyle = "#e9c46a"; c.fillRect(-11, -9.5, 22, 1.1);
+      for (const [bx, bw, bh, col] of [[-9, 7, 7, "#c8243a"], [-1.5, 6, 9, "#2f7a3a"], [5, 5.5, 6, "#e9c46a"]]) {
+        c.fillStyle = col; c.fillRect(bx, -9.5 - bh, bw, bh);
+        c.fillStyle = col === "#e9c46a" ? "#c8243a" : "#f6e2a8"; c.fillRect(bx + bw / 2 - .6, -9.5 - bh, 1.2, bh); c.fillRect(bx, -9.5 - bh / 2 - .6, bw, 1.2);
+      }
+    }
+    c.fillStyle = "#14141a"; c.fillRect(-12, -4.5, 24, 2.4);
+    for (const wx of [-6.5, 6.5]) { c.fillStyle = "#14141a"; c.beginPath(); c.arc(wx, -1.2, 2.6, 0, TAU); c.fill(); c.fillStyle = "#e9c46a"; c.beginPath(); c.arc(wx, -1.2, .9, 0, TAU); c.fill(); }
+  }
   function glove(x, y, ang, open, spread) { // a white glove at the wrist, pointing along ang; open = 1 is a waving open hand
     const c = ctx; c.save(); c.translate(x, y); c.rotate(ang);
     const gr = c.createLinearGradient(0, -18, 0, 18); gr.addColorStop(0, "#ffffff"); gr.addColorStop(.55, "#eef1f8"); gr.addColorStop(1, "#b7c1db");
@@ -2021,7 +2058,7 @@
       this.shake = this.shakeV = 0; this.fly = null; this.nextFly = Infinity; this.crystT = 9; this.nextGust = T_DONE + 7;
       this.sc = { gift: "held", tGive: -1, tOpen: -1, tClose: -1, waveT: 0, lower: 0, low: 0, bub: null, talk: 0, blink: 0, rect: null, gpos: null, breath: [], nextBreath: 0, laughT: 0, twT: 0 };
       this.hearts = []; fw = []; fwRockets = []; fwFlash = []; fwText = [];
-      this.notes = []; this.noteI = 0; this.bloomT = 0; this.roots = null; this.pg = { next: T_SNOWMAN + 17, kiss: -9, kh: true, hop: -9, hearts: [] };
+      this.notes = []; this.noteI = 0; this.bloomT = 0; this.roots = null; this.showT = 0; this.nextShow = T_DONE + 8; this.tsmoke = []; this.trainPos = null; this.trainPuff = 0; this.pg = { next: T_SNOWMAN + 17, kiss: -9, kh: true, hop: -9, hearts: [] };
       document.body.classList.remove("p-text");
       hideHint(); hideCard(); hintEl.classList.remove("side");
     },
@@ -2259,6 +2296,46 @@
       if (sp > 0) { const [x, y] = pt(n); ctx.globalCompositeOperation = "lighter"; glow("cream", x, y, 9 * ds, .8 * sp); glow("white", x, y, 2.6 * ds, sp); ctx.globalCompositeOperation = "source-over"; }
       this.once("snowheart", t0, () => { if (sfx) { const a = actx.currentTime; [1568, 1760, 2093, 2349, 2637].forEach((fq, i) => bell(fq, a + i * .45, .5, .02, sfx)); } });
       this.once("snowname", t0 + 2.5, () => chime(.035));
+      ctx.globalAlpha = 1;
+    },
+    drawTrain(t, dt, cx, base, mw, S) { // a little toy train circles the tree on a track in the snow
+      const t0 = T_GIFTS + 3.5; if (t < t0) return;
+      const oy = base + 4 * S, rx = mw * .98, ry = mw * .12, kt = ease(clamp((t - t0) / 1.2));
+      ctx.lineCap = "round";
+      for (let i = 0; i <= 40; i++) { // sleepers
+        const a = i / 40 * Math.PI, x = cx + Math.cos(a) * rx, y = oy + Math.sin(a) * ry, al = clamp(Math.sin(a) * 4) * kt;
+        ctx.globalAlpha = .7 * al; ctx.strokeStyle = "#5a3d28"; ctx.lineWidth = 1.3 * S; ctx.beginPath(); ctx.moveTo(x, y - 2.6 * S); ctx.lineTo(x, y + 2.6 * S); ctx.stroke();
+      }
+      for (const off of [-1.8, 1.8]) { // rails
+        ctx.strokeStyle = "rgba(205,212,228,.85)"; ctx.lineWidth = .8 * S; ctx.beginPath();
+        for (let i = 0; i <= 60; i++) { const a = i / 60 * Math.PI, x = cx + Math.cos(a) * rx, y = oy + Math.sin(a) * ry + off * S; ctx.globalAlpha = kt; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
+        ctx.stroke();
+      }
+      const th0 = -.7 + (t - t0 - .4) * TAU / 15, dl = 31 * S / rx;
+      this.trainPos = null;
+      for (const [j, kind] of [[2, 2], [1, 1], [0, 0]]) { // the carriage, the wagon of presents, then the engine in front
+        const a = th0 - j * dl, sn = Math.sin(a), al = clamp(sn * 5) * kt;
+        if (al <= 0) continue;
+        const x = cx + Math.cos(a) * rx, y = oy + sn * ry, sc = S * (.82 + .18 * sn), rot = Math.atan2(-ry * Math.cos(a), rx * sn) * .35;
+        ctx.globalAlpha = .4 * al; ctx.drawImage(shadowBlob(), x - 16 * sc, y - 2 * sc, 32 * sc, 5 * sc);
+        ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(sc, sc); ctx.globalAlpha = al;
+        if (kind === 0) drawLoco(t); else drawWagon(t, kind === 2);
+        ctx.restore();
+        if (kind === 0) {
+          this.trainPos = [x, y - 8 * sc];
+          ctx.globalCompositeOperation = "lighter"; glow("bulb", x - 15.5 * sc, y - 8.5 * sc, 10 * sc, .55 * al); ctx.globalCompositeOperation = "source-over";
+          this.trainSmokeT = (this.trainSmokeT || 0) - dt;
+          if (this.trainSmokeT <= 0) { this.trainSmokeT = this.trainPuff > 0 ? .07 : .26; this.trainPuff = Math.max(0, (this.trainPuff || 0) - 1); (this.tsmoke = this.tsmoke || []).push({ x: x - 11 * sc, y: y - 21 * sc, t0: t, s: sc }); }
+        }
+      }
+      const ts = this.tsmoke || []; // puffs of smoke drifting back from the chimney
+      for (let i = ts.length - 1; i >= 0; i--) {
+        const p = ts[i], u = (t - p.t0) / 1.8;
+        if (u >= 1) { ts.splice(i, 1); continue; }
+        const r = (2.5 + 9 * u) * p.s; ctx.globalAlpha = .32 * (1 - u) * Math.min(1, u * 6);
+        ctx.drawImage(soft(), p.x + u * 14 * p.s - r, p.y - u * 22 * p.s - r, r * 2, r * 2);
+      }
+      this.once("trainToot", t0 + 1.6, () => toot());
       ctx.globalAlpha = 1;
     },
     drawPenguins(t, dt) { // the penguin couple waddles in, then stays close; now and then a little heart
@@ -2535,6 +2612,7 @@
           if (Math.random() < .9) sparks.push({ x: hx + skew * (base - hy), y: hy, vx: rand(-30, 30), vy: rand(-10, 40), life: 1, dec: rand(1, 1.6), size: rand(2.5, 5), c: "champ", g: 50 });
         }
       }
+      if (t > this.nextShow) { this.showT = t; this.nextShow = t + rand(22, 30); arpeggio([2093, 1760, 1568, 1319, 1047], .14, .018); } // a sparkle runs down the tree
       this.drawConstellation(t, cx, apex, S);
       for (const p of this.P) {
         const k = ease(clamp((t - T_FORM - p.delay) / FLY));
@@ -2559,6 +2637,7 @@
         const x = cx + l.x, y = apex + l.y;
         if (p.cov === -1 && grown(l.x, l.y)) { p.cov = t; l.boost = .7; }
         if (this.bloomT && t - this.bloomT < 1.4 && Math.abs(l.y / th - (1 - (t - this.bloomT) / 1.2)) < .05) l.boost = Math.max(l.boost, .9);
+        if (this.showT && t - this.showT < 2.2 && Math.abs(l.y / th - (t - this.showT) / 1.8) < .045) l.boost = Math.max(l.boost, .85);
         const cov = p.cov === -1 ? 0 : clamp((t - p.cov) / .6);
         const vis = l.z > .05 ? 1 : l.z > -.55 ? .1 + (l.z + .55) / .6 * .9 : 0;
         const v = 1 + (vis - 1) * cov;
@@ -2638,6 +2717,7 @@
         ctx.globalAlpha = Math.min(1, k * 3);
         ctx.drawImage(gf.c, gf.x - gf.ax, y - gf.ay, gf.cw, gf.ch);
       }
+      this.drawTrain(t, dt, cx, base, mw, S);
 
       /* the snow in front comes last */
       const kfr = ease(K(T_FRONT, 2.4)), frOff = (1 - kfr) * H * .36;
@@ -3026,6 +3106,7 @@
           o.gl = .5; ping(o.note || [1568, 1760, 2093, 2349][o.type.length % 4]); return;
         }
       }
+      if (this.trainPos && Math.hypot(x - this.trainPos[0], y - this.trainPos[1]) < 26 * this.tree.S) { toot(); this.trainPuff = 8; return; }
       for (const gf of this.gifts) {
         if (!gf.landed) continue;
         if (Math.abs(x - gf.x) < gf.bw * .6 + 6 && y < gf.y + 8 && y > gf.y - gf.bh - 16) { gf.hv = -260; burst(gf.x, gf.y - gf.bh, 14, "gold"); ping(gf.note); return; }
@@ -3310,6 +3391,16 @@
     }
   }
   function ping(f, vol = .05) { if (sfx) bell(f, actx.currentTime, .3, vol, sfx); }
+  function toot() { // the toy train's whistle, twice
+    if (!sfx) return;
+    const t = actx.currentTime;
+    for (const d of [0, .75]) for (const f of [587.33, 739.99, 880]) {
+      const o = actx.createOscillator(), g = actx.createGain(), len = d ? .35 : .55;
+      o.type = "triangle"; o.frequency.setValueAtTime(f * .97, t + d); o.frequency.linearRampToValueAtTime(f, t + d + .08);
+      g.gain.setValueAtTime(.0001, t + d); g.gain.linearRampToValueAtTime(.02, t + d + .06); g.gain.setValueAtTime(.02, t + d + len - .15); g.gain.linearRampToValueAtTime(.0001, t + d + len);
+      o.connect(g).connect(sfx); o.start(t + d); o.stop(t + d + len + .05);
+    }
+  }
   function chime(vol = .06) { if (sfx) { const t = actx.currentTime; [1046.5, 1318.5, 1568].forEach((f, i) => bell(f, t + i * .07, .3, vol, sfx)); } }
   /* Santa's voice: the device's own speech synthesis, where it is available */
   const synth = window.speechSynthesis || null;
