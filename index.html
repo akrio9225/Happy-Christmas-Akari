@@ -159,6 +159,16 @@
   .gcard .gc-in > :nth-child(5) { animation-delay: 2.2s; }
   .gcard .gc-in > :nth-child(6) { animation-delay: 2.5s; }
   .gcard .gc-in > :nth-child(7) { animation-delay: 3.2s; }
+  /* the message writes itself, word by word, as if by hand; what follows waits for the last word */
+  .gcard .gc-in > .gc-msg { opacity: 1; animation: none; }
+  .gc-msg .w { display: inline-block; opacity: 0; }
+  .gcard.show .gc-msg .w { animation: inkw .62s ease forwards; animation-delay: calc(1.5s + var(--i) * .15s); }
+  .gcard.out .gc-msg .w { opacity: 1; }
+  @keyframes inkw { 0% { opacity: 0; filter: blur(3px); transform: translateY(2px) scale(1.05); color: #b8a08c; } 55% { opacity: 1; filter: blur(.4px); } 100% { opacity: 1; filter: none; transform: none; color: #4a2c24; } }
+  .gcard .gc-in > :nth-child(4) { animation-delay: var(--t4, 1.9s); }
+  .gcard .gc-in > :nth-child(5) { animation-delay: var(--t5, 2.2s); }
+  .gcard .gc-in > :nth-child(6) { animation-delay: var(--t6, 2.5s); }
+  .gcard .gc-in > :nth-child(7) { animation-delay: var(--t7, 3.2s); }
   @keyframes beat { 0%, 56%, 100% { transform: scale(1); } 14% { transform: scale(1.14); } 28% { transform: scale(1); } 42% { transform: scale(1.08); } }
 </style>
 </head>
@@ -504,6 +514,38 @@
         else if (wishStars.length === 2) showHint("your wishes are making your own constellation ✦", 5200);
       }
     }
+  }
+  let fstar = null, nextFStar = 0, fstarHinted = false;
+  function drawFallingStar(dt) { // after the New Year show, now and then a slow golden falling star crosses the sky: tap it to keep it
+    const sc = Scene.sc, t = Scene.t;
+    if (!Scene.running || !sc || !(sc.tClose > 0) || t < sc.tClose + 26) return;
+    if (!nextFStar || nextFStar < sc.tClose) nextFStar = t + rand(2, 6);
+    if (!fstar && t > nextFStar) {
+      const d = Math.random() < .5 ? 1 : -1;
+      fstar = { x: d > 0 ? -24 : W + 24, y: rand(H * .27, H * .33), vx: d * rand(105, 130), vy: rand(14, 26), trail: [] };
+      nextFStar = t + rand(36, 56);
+      if (sfx) { const a = actx.currentTime; bell(2637, a, 1, .018, sfx); bell(3520, a + .14, 1, .014, sfx); }
+      if (!fstarHinted) { fstarHinted = true; showHint("a falling star! tap it to catch it ✦", 4200); }
+    }
+    if (!fstar) return;
+    const f = fstar; f.x += f.vx * dt; f.y += f.vy * dt; f.trail.push([f.x, f.y]); if (f.trail.length > 30) f.trail.shift();
+    if (f.x < -40 || f.x > W + 40) { fstar = null; return; }
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.globalCompositeOperation = "lighter";
+    f.trail.forEach(([x, y], i) => { const u = i / f.trail.length; glow("gold", x, y, 1.5 + 6 * u, .04 + .3 * u * u); });
+    const tw = .82 + .18 * Math.sin(GT * 19);
+    glow("cream", f.x, f.y, 18, .5 * tw); glow("white", f.x, f.y, 3.6, 1);
+    ctx.globalAlpha = .7 * tw; ctx.fillStyle = "#fff4dc"; ctx.fillRect(f.x - 9, f.y - .5, 18, 1); ctx.fillRect(f.x - .5, f.y - 9, 1, 18);
+    ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+    if (Math.random() < .5) { const [wx, wy] = toWorld(f.x, f.y, 1); sparks.push({ x: wx, y: wy, vx: rand(-10, 10) - f.vx * .1, vy: rand(10, 40), life: 1, dec: rand(.9, 1.4), size: rand(1.6, 2.8), c: "champ", g: 40 }); }
+  }
+  function catchFallingStar(sx, sy) {
+    if (!fstar || Math.hypot(sx - fstar.x, sy - fstar.y) > 40) return false;
+    const [wx, wy] = toWorld(fstar.x, fstar.y, 1), [kx, ky] = toWorld(fstar.x, fstar.y, .06);
+    burst(wx, wy, 34, "gold");
+    wishStars.push({ x: kx / W, y: ky / H, t: GT }); if (wishStars.length > 40) wishStars.shift(); saveWishes();
+    if (sfx) { const a = actx.currentTime; [1568, 1976, 2349, 3136].forEach((q, j) => bell(q, a + j * .07, .8, .035, sfx)); }
+    showHint("you caught a falling star ✦ it's yours to keep", 5000);
+    fstar = null; return true;
   }
   function shoot(sx, sy) { const [x, y] = toWorld(sx, sy, .06), d = Math.random() < .5 ? 1 : -1; shooters.push({ x, y, vx: d * rand(480, 640), vy: rand(160, 300), life: 1 }); }
 
@@ -2169,7 +2211,23 @@
     fwFlash.push({ x: r.x, y: r.y, c: "gold", a: .6 });
     if (sfx) { const a = actx.currentTime; noise(a, 1.4, 150, .3, "lowpass"); [1047, 1319, 1568, 2093, 2637].forEach((f, i) => bell(f, a + .5 + i * .13, .6, .03, sfx)); }
   }
+  let worldFlash = [];
+  function lightWorld(x, y, c, k) { const [sx, sy] = screenOf(x, y, FW_D); worldFlash.push({ x: sx, y: sy, c: PAL[c] || PAL.white, a: 1, k }); if (worldFlash.length > 6) worldFlash.shift(); }
+  function drawWorldFlash(dt) { // each burst throws its coloured light over the sky, the snow, the tree — and Santa
+    if (!worldFlash.length) return;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 1;
+    for (let i = worldFlash.length - 1; i >= 0; i--) {
+      const f = worldFlash[i]; f.a -= dt * 1.5; if (f.a <= 0) { worldFlash.splice(i, 1); continue; }
+      const [r, g, b] = f.c, a = f.a * f.a * f.k;
+      let gr = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, H * .85); gr.addColorStop(0, `rgba(${r},${g},${b},${.13 * a})`); gr.addColorStop(.5, `rgba(${r},${g},${b},${.04 * a})`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+      ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+      gr = ctx.createLinearGradient(0, H * .72, 0, H); gr.addColorStop(0, `rgba(${r},${g},${b},0)`); gr.addColorStop(1, `rgba(${r},${g},${b},${.09 * a})`);
+      ctx.fillStyle = gr; ctx.fillRect(0, H * .72, W, H * .28);
+    }
+    ctx.globalCompositeOperation = "source-over";
+  }
   function explode(r) {
+    lightWorld(r.x, r.y, r.kind === "text" ? "gold" : r.pal[0], r.kind === "heart" || r.kind === "text" ? 1.25 : 1);
     if (r.kind === "text") { textBurst(r); return; }
     const heart = r.kind === "heart", n = heart ? 96 : r.kind === "ring" ? 56 : 84, sp = rand(95, 125) * clamp(Math.min(W, H) / 420, .85, 1.6);
     for (let i = 0; i < n; i++) {
@@ -3474,6 +3532,7 @@
     },
     tap(sx0, sy0) {
       if (!this.running) return;
+      if (catchFallingStar(sx0, sy0)) return;
       const t = this.t, { cx, apex, base } = this.geo(), [x, y] = toWorld(sx0, sy0, 1), sc = this.sc;
       if (sc && t > T_SC) {
         if (sc.gift === "ready" && sc.gpos && Math.hypot(sx0 - sc.gpos[0], sy0 - sc.gpos[1]) < 90 * sc.gpos[2]) { this.tapGift(t); return; }
@@ -3538,7 +3597,18 @@
   function showHint(msg, ms = 6500) { hintEl.textContent = msg; hintEl.classList.add("show"); clearTimeout(hintT); hintT = setTimeout(() => hintEl.classList.remove("show"), ms); }
   function hideHint() { clearTimeout(hintT); hintEl.classList.remove("show"); }
   const cardEl = $("#gcard");
-  function showCard() { cardEl.classList.add("show"); cardEl.setAttribute("aria-hidden", "false"); }
+  const cardWords = (() => { // split the message into words that will be written one by one
+    const m = cardEl.querySelector(".gc-msg"), words = m.textContent.trim().split(/\s+/), gi = cardEl.querySelector(".gc-in");
+    const esc = w => w.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+    m.innerHTML = words.map((w, i) => `<span class="w" style="--i:${i}">${esc(w)}</span>`).join(" ");
+    const tEnd = 1.5 + words.length * .15 + .45;
+    [[4, 0], [5, .35], [6, .6], [7, 1.3]].forEach(([k, d]) => gi.style.setProperty("--t" + k, (tEnd + d).toFixed(2) + "s"));
+    return words.length;
+  })();
+  function showCard() {
+    cardEl.classList.add("show"); cardEl.setAttribute("aria-hidden", "false");
+    if (sfx) { const a = actx.currentTime + 1.5; for (let i = 0; i < cardWords; i++) noise(a + i * .15 + .04 + Math.random() * .04, .05 + Math.random() * .05, 3800 + Math.random() * 3000, .0055, "highpass"); } // the soft scratch of a pen
+  }
   function hideCard() {
     if (cardEl.classList.contains("show")) { cardEl.classList.add("out"); setTimeout(() => cardEl.classList.remove("out"), 1300); }
     cardEl.classList.remove("show"); cardEl.setAttribute("aria-hidden", "true");
@@ -3898,7 +3968,9 @@
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
     ctx.clearRect(0, 0, W, H);
     drawSky(GT, dt);
+    drawFallingStar(dt);
     ctx.save(); Scene.draw(dt, GT); ctx.restore();
+    drawWorldFlash(dt);
     const pre = Scene.running ? 1 - clamp(Scene.t / 1.6) : 1;
     if (pre > 0) { ctx.save(); drawSnow(dt, .3 * pre); ctx.restore(); }
     drawSparks(dt);
