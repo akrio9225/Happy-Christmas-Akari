@@ -1726,56 +1726,104 @@
     return (cache[key] = { c, size: S / DPR });
   }
 
-  // Antarctic mountains: fractal ridges, snow fields shaded by slope, rocky couloirs and haze
+  function makeNoise2(R) { // smooth 2-D value noise, -1..1
+    const P = new Float32Array(65536); for (let i = 0; i < 65536; i++) P[i] = R() * 2 - 1;
+    return (x, y) => {
+      const xf = Math.floor(x), yf = Math.floor(y), fx = x - xf, fy = y - yf, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+      const i0 = xf & 255, i1 = (xf + 1) & 255, j0 = (yf & 255) << 8, j1 = ((yf + 1) & 255) << 8;
+      const a = P[j0 | i0], b = P[j0 | i1], c = P[j1 | i0], d = P[j1 | i1];
+      return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+    };
+  }
+  // Snowy mountains in moonlight: fractal ridges; each face lit or in shadow from the moon (upper left),
+  // snow-filled gullies between dark ribs of rock that follow the fall line, bare rock on the steepest parts, haze in the valleys
   function mountains(L, baseY, amp, seed, o) {
     const g = L.g, R = mulberry32(seed), nz = makeNoise(R), x0 = -M - 6, x1 = W + M + 6, step = 2, n = Math.ceil((x1 - x0) / step) + 1;
     const pk = Array.from({ length: o.peaks }, () => ({ x: x0 + R() * (x1 - x0), h: amp * (.45 + R() * .55), w: W * (.11 + R() * .16) }));
-    const xs = new Float32Array(n), ys = new Float32Array(n), sl = new Float32Array(n);
+    const xs = new Float32Array(n), ys = new Float32Array(n);
     for (let i = 0; i < n; i++) {
       const x = x0 + i * step; let hgt = 0;
       for (const p of pk) { const d = Math.abs(x - p.x) / p.w; if (d < 1) hgt = Math.max(hgt, p.h * Math.pow(1 - d, 1.25)); }
       hgt += amp * (.16 * nz(x * .011) + .07 * nz(x * .037 + 9) + .03 * nz(x * .11 + 17) + .012 * nz(x * .33 + 29));
       xs[i] = x; ys[i] = baseY - Math.max(amp * .05, hgt);
     }
-    for (let i = 0; i < n; i++) sl[i] = ys[i] + (baseY - ys[i]) * (.22 + .2 * (nz(xs[i] * .02 + 40) * .5 + .5)) + amp * .05 * nz(xs[i] * .19 + 60) + 2;
-    const ridge = () => { g.beginPath(); g.moveTo(x0, H + M + 2); for (let i = 0; i < n; i++) g.lineTo(xs[i], ys[i]); g.lineTo(x1, H + M + 2); g.closePath(); };
-    ridge();
-    let gr = g.createLinearGradient(0, baseY - amp, 0, baseY + 30); gr.addColorStop(0, o.rock0); gr.addColorStop(1, o.rock1);
-    g.fillStyle = gr; g.fill();
-    const sm = i => { let s = 0; for (let k = -4; k <= 4; k++) s += ys[Math.min(n - 1, Math.max(0, i + k))]; return s / 9; };
-    const gx = g.createLinearGradient(x0, 0, x1, 0);
-    for (let i = 0; i < n; i += 3) {
-      const slope = (sm(Math.min(n - 1, i + 3)) - sm(Math.max(0, i - 3))) / (6 * step);
-      gx.addColorStop((xs[i] - x0) / (x1 - x0), mixc(o.snowDark, o.snowLit, clamp(.5 - slope * 1.4)));
+    const n2 = makeNoise2(R);
+    const blur = (a, rad) => { const out = new Float32Array(n); for (let i = 0; i < n; i++) { let s = 0; for (let k = -rad; k <= rad; k++) s += a[Math.min(n - 1, Math.max(0, i + k))]; out[i] = s / (2 * rad + 1); } return out; };
+    const bs = blur(ys, 30), broad = i => -(bs[Math.min(n - 1, i + 3)] - bs[Math.max(0, i - 3)]) / (6 * step); // > 0 on the left flank of a big mountain
+    const sp = []; // a spur ridge runs down from every summit and shoulder of the skyline, fanning out away from the main peaks
+    for (let i = 2; i < n - 2; i++) {
+      let top = true; for (let k = -5; k <= 5 && top; k++) if (k && ys[Math.min(n - 1, Math.max(0, i + k))] < ys[i]) top = false;
+      if (!top) continue;
+      let lo = ys[i]; for (let k = -16; k <= 16; k++) lo = Math.max(lo, ys[Math.min(n - 1, Math.max(0, i + k))]);
+      if (lo - ys[i] < 2.5) continue;
+      sp.push({ x: xs[i], y: ys[i], h: baseY - ys[i], m: .75 + R() * .55, s: clamp(-broad(i) * .55 + (R() - .5) * .35, -.7, .7), wb: R() * TAU, wa: 1.5 + R() * 3 });
     }
-    g.save(); ridge(); g.clip();
-    g.beginPath(); for (let i = 0; i < n; i++) g.lineTo(xs[i], ys[i] - 1); for (let i = n - 1; i >= 0; i--) g.lineTo(xs[i], sl[i]); g.closePath();
-    g.fillStyle = gx; g.fill();
-    g.strokeStyle = o.streak; g.lineCap = "round";
-    for (let k = 0; k < o.streaks; k++) {
-      const i = R() * n | 0, len = (sl[i] - ys[i]) * (.6 + R() * .5);
-      if (len < 6) continue;
-      let x = xs[i], y = ys[i] + 2;
-      g.lineWidth = .6 + R() * .9; g.globalAlpha = .22 + R() * .3;
-      g.beginPath(); g.moveTo(x, y);
-      for (let s = 0; s < len; s += 3) { x += (R() - .5) * 1.6 + (R() < .5 ? -.3 : .3); y += 3; g.lineTo(x, y); }
-      g.stroke();
+    for (const S of sp.slice()) for (let b2 = 0, nb = 2 + (R() * 2 | 0); b2 < nb; b2++) { // side ridges branch off lower down
+      const d = amp * (.12 + R() * .6), sd = R() < .5 ? -1 : 1, x = S.x + d * S.s + S.wa * Math.sin(d * .06 + S.wb) * Math.min(1, d / 25);
+      sp.push({ x, y: S.y + d, h: S.h - 3 - R() * 6, m: S.m * (.9 + R() * .3), s: clamp(S.s + sd * (.3 + R() * .4), -.9, .9), wb: R() * TAU, wa: 1 + R() * 2.5 });
     }
-    g.globalAlpha = 1;
-    gr = g.createLinearGradient(0, baseY - amp * .35, 0, baseY + 24); gr.addColorStop(0, `rgba(${o.haze},0)`); gr.addColorStop(1, `rgba(${o.haze},${o.hazeA})`);
-    g.fillStyle = gr; g.fillRect(x0, baseY - amp * .35, x1 - x0, H);
-    g.restore();
+    const NS = sp.length, sxr = new Float32Array(NS), on = new Uint8Array(NS);
+    const qf = o.q || 1, q = DPR * qf, cw = Math.ceil(L.c.width * qf), ch = Math.ceil(L.c.height * qf);
+    const off = mk(cw, ch), og = off.getContext("2d"), img = og.createImageData(cw, ch), D = img.data;
+    const hex = s => [1, 3, 5].map(k => parseInt(s.slice(k, k + 2), 16));
+    const RL = hex(o.rock0), RD = hex(o.rock1), SL = o.snowLit, SD = o.snowDark, HZ = o.haze.split(",").map(Number);
+    const hz0 = baseY - amp * .35, hzD = amp * .35 + 24, deep = amp * 1.9, yTop = new Float32Array(cw);
+    for (let i = 0; i < cw; i++) { const fi = clamp((i / q - M - x0) / step, 0, n - 1.001), k0 = fi | 0; yTop[i] = ys[k0] + (ys[k0 + 1] - ys[k0]) * (fi - k0); }
+    const SH = new Float32Array(NS), SM = new Float32Array(NS), BS = 16, cand = new Int32Array(NS);
+    for (let s2 = 0; s2 < NS; s2++) { SH[s2] = sp[s2].h; SM[s2] = sp[s2].m; }
+    for (let j = 0; j < ch; j++) {
+      const y = j / q + L.top, h = Math.pow(clamp((y - hz0) / hzD), 1.25) * o.hazeA; // valley haze
+      for (let s2 = 0; s2 < NS; s2++) { const S = sp[s2], dy = y - S.y; on[s2] = dy >= 0 ? 1 : 0; if (dy >= 0) sxr[s2] = S.x + dy * S.s + S.wa * Math.sin(dy * .06 + S.wb) * Math.min(1, dy / 25); }
+      for (let ia = 0; ia < cw; ia += BS) {
+        const ib = Math.min(cw, ia + BS), xa = ia / q - M, xb = (ib - 1) / q - M;
+        let nc = 0, lb = -1e9; // only the ridges that can matter in this little block of pixels
+        for (let s2 = 0; s2 < NS; s2++) if (on[s2]) { const v = SH[s2] - Math.max(Math.abs(xa - sxr[s2]), Math.abs(xb - sxr[s2])) * SM[s2]; if (v > lb) lb = v; }
+        for (let s2 = 0; s2 < NS; s2++) if (on[s2]) { const xs2 = sxr[s2], dn = xs2 < xa ? xa - xs2 : xs2 > xb ? xs2 - xb : 0; if (SH[s2] - dn * SM[s2] >= lb - 14) cand[nc++] = s2; }
+      for (let i = ia; i < ib; i++) {
+        const dd = y - yTop[i]; if (dd < -1 / q) continue;
+        const x = i / q - M, p = (j * cw + i) * 4;
+        let cr, cg, cb;
+        if (dd > deep) { cr = RD[0]; cg = RD[1]; cb = RD[2]; }
+        else {
+          let v1 = -1e9, v2 = -1e9, b1 = -1, b2 = -1;
+          for (let c2 = 0; c2 < nc; c2++) {
+            const s2 = cand[c2], v = SH[s2] - Math.abs(x - sxr[s2]) * SM[s2];
+            if (v > v1) { v2 = v1; b2 = b1; v1 = v; b1 = s2; } else if (v > v2) { v2 = v; b2 = s2; }
+          }
+          let fx = 0, crest = 9;
+          if (b1 >= 0) {
+            const e1 = x - sxr[b1], g1 = -sp[b1].m * e1 / Math.sqrt(e1 * e1 + .8); crest = e1;
+            if (b2 >= 0) { const e2 = x - sxr[b2], g2 = -sp[b2].m * e2 / Math.sqrt(e2 * e2 + .8), w = 1 / (1 + Math.exp((v1 - v2) / 2.6)); fx = g1 + (g2 - g1) * w; } else fx = g1;
+          }
+          fx = clamp(fx * 1.05, -1.2, 1.2); // > 0: the face turns to the moon
+          const grain = n2(x * .5, y * .5), u = x + dd * fx * .6, streak = n2(u * .17, y * .011 + 3) + .5 * n2(u * .41 + 9, y * .02); // fine gullies down the fall line
+          const shade = clamp(.46 + .38 * fx + .09 * streak + .05 * grain + .1 * (1 - clamp(dd / amp)) + .24 * Math.exp(-dd * .3) * (fx > 0 ? 1 : .35));
+          const low = clamp((dd - amp * .25) / (amp * .9)), rockLine = Math.exp(-(crest - 1.3) * (crest - 1.3) / 1.4) * clamp(dd / 8);
+          const snowy = 1.08 - .72 * low * low * (3 - 2 * low) - .7 * rockLine - .45 * clamp(-streak - .45) * clamp(Math.abs(fx) - .3) + .12 * n2(x * .05 + 11, y * .035) - .07 * grain;
+          const sn = clamp((snowy - .42) * 5), rs = shade * .9;
+          const rr = RD[0] + (RL[0] - RD[0]) * rs, rg = RD[1] + (RL[1] - RD[1]) * rs, rbl = RD[2] + (RL[2] - RD[2]) * rs;
+          cr = rr + (SD[0] + (SL[0] - SD[0]) * shade - rr) * sn;
+          cg = rg + (SD[1] + (SL[1] - SD[1]) * shade - rg) * sn;
+          cb = rbl + (SD[2] + (SL[2] - SD[2]) * shade - rbl) * sn;
+        }
+        D[p] = cr + (HZ[0] - cr) * h; D[p + 1] = cg + (HZ[1] - cg) * h; D[p + 2] = cb + (HZ[2] - cb) * h;
+        D[p + 3] = 255 * clamp(dd * q + 1);
+      }
+      }
+    }
+    og.putImageData(img, 0, 0);
+    g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingQuality = "high"; g.drawImage(off, 0, 0, L.c.width, L.c.height); g.restore();
     g.strokeStyle = o.rim; g.lineWidth = 1; g.beginPath(); for (let i = 0; i < n; i++) i ? g.lineTo(xs[i], ys[i]) : g.moveTo(xs[i], ys[i]); g.stroke();
   }
   function buildWorld() {
     const R = mulberry32(777), rr = (a, b) => a + R() * (b - a);
     const layer = top => { const h = H - top + M, c = mk((W + 2 * M) * DPR, h * DPR), g = c.getContext("2d"); g.setTransform(DPR, 0, 0, DPR, M * DPR, -top * DPR); return { c, g, top, h }; };
     const far0 = layer(H * .5);
-    mountains(far0, H * .69, H * .1, 4033, { peaks: 8, rock0: "#273157", rock1: "#1c2447", snowLit: [126, 138, 182], snowDark: [64, 74, 112], streak: "#1e2649", streaks: 24, haze: "48,60,106", hazeA: .85, rim: "rgba(170,255,225,.1)" });
+    mountains(far0, H * .69, H * .1, 4033, { peaks: 8, rock0: "#273157", rock1: "#1c2447", snowLit: [126, 138, 182], snowDark: [64, 74, 112], haze: "48,60,106", hazeA: .85, rim: "rgba(170,255,225,.1)", q: .75 });
     const far = layer(H * .52);
-    mountains(far, H * .715, H * .13, 4101, { peaks: 7, rock0: "#1e284c", rock1: "#141b38", snowLit: [146, 160, 202], snowDark: [52, 64, 104], streak: "#141a34", streaks: 40, haze: "40,52,96", hazeA: .75, rim: "rgba(170,255,225,.14)" });
+    mountains(far, H * .715, H * .13, 4101, { peaks: 7, rock0: "#1e284c", rock1: "#141b38", snowLit: [146, 160, 202], snowDark: [52, 64, 104], haze: "40,52,96", hazeA: .75, rim: "rgba(170,255,225,.14)" });
     const near = layer(H * .6);
-    mountains(near, H * .772, H * .085, 4202, { peaks: 6, rock0: "#131a36", rock1: "#090d20", snowLit: [160, 174, 214], snowDark: [42, 52, 90], streak: "#0a0e22", streaks: 46, haze: "22,30,64", hazeA: .7, rim: "rgba(190,230,255,.12)" });
+    mountains(near, H * .772, H * .085, 4202, { peaks: 6, rock0: "#131a36", rock1: "#090d20", snowLit: [160, 174, 214], snowDark: [42, 52, 90], haze: "22,30,64", hazeA: .7, rim: "rgba(190,230,255,.12)" });
     const fy = x => H * .805 + Math.sin(x / W * TAU * .8 + .6) * H * .007 + Math.sin(x / W * TAU * 2.3 + 1.7) * H * .004;
     const dfy = x => H * .888 + Math.sin(x / W * TAU * .55 + 2.2) * H * .014 + Math.sin(x / W * TAU * 1.7 + .3) * H * .005;
     const cabX = W * .9, P0 = [cabX, fy(cabX) + 5], P1 = [W * .94, H * .9], P2 = [W * .66, H + 14];
@@ -1818,25 +1866,87 @@
       g.restore();
       g.strokeStyle = "rgba(255,255,255,.7)"; g.lineWidth = 1; g.beginPath(); for (let x = -M; x <= W + M + 4; x += 4) x > -M ? g.lineTo(x, dfy(x)) : g.moveTo(x, dfy(x)); g.stroke();
       for (let i = 0; i < 700; i++) { const x = rr(-M, W + M), y = rr(dfy(x) + 2, H + M); g.fillStyle = R() < .55 ? "rgba(255,255,255,.12)" : "rgba(60,70,120,.1)"; g.fillRect(x, y, 1, 1); }
-      const sc = Math.min(1.3, H / 800);
-      for (const [xn, yn] of [[.03, .94], [.31, .975], [.47, .955], [.57, .99], [.98, .95]]) { // snow-capped rocks
-        const x = xn * W, y = Math.max(dfy(x) + 12, yn * H), r = rr(5, 10) * sc;
-        g.fillStyle = "rgba(70,84,130,.32)"; g.beginPath(); g.ellipse(x + r * .35, y + r * .15, r * 1.8, r * .3, 0, 0, TAU); g.fill();
-        g.fillStyle = "#30364f"; g.beginPath(); g.moveTo(x - r * 1.3, y);
-        for (let k = 1; k < 8; k++) { const a = Math.PI + k / 8 * Math.PI, q = .8 + R() * .35; g.lineTo(x + Math.cos(a) * r * 1.3 * q, y + Math.sin(a) * r * .9 * q); }
-        g.lineTo(x + r * 1.3, y); g.closePath(); g.fill();
-        const sg = g.createRadialGradient(x - r * .2, y - r * .6, 0, x - r * .1, y - r * .5, r * 1.35);
-        sg.addColorStop(0, "rgba(242,246,255,1)"); sg.addColorStop(.72, "rgba(222,231,250,.95)"); sg.addColorStop(1, "rgba(200,212,245,0)");
-        g.fillStyle = sg; g.beginPath(); g.ellipse(x - r * .1, y - r * .5, r * 1.28, r * .55, 0, 0, TAU); g.fill();
-      }
-      g.lineCap = "round";
-      for (let i = 0; i < 24; i++) { // dry grass poking through the snow
-        const x = rr(-M, W + M), y = rr(dfy(x) + 8, H + 4), n = 3 + (R() * 4 | 0), hh = rr(5, 11) * sc;
-        g.strokeStyle = `rgba(${48 + (R() * 30 | 0)},${42 + (R() * 20 | 0)},${46 + (R() * 20 | 0)},.6)`; g.lineWidth = .8;
+      const sc = Math.min(1.3, H / 800), Rf = mulberry32(5150);
+      for (let i = 0; i < 40; i++) R(); // (keeps the random layout of the forest below exactly as it was)
+      for (let i = 0; i < 24; i++) { R(); R(); const n = 3 + (R() * 4 | 0); for (let k = 0; k < 4 + n; k++) R(); }
+      const softDrift = (x, y, rx, ry, a) => { // a soft-edged little bank of snow
+        g.save(); g.translate(x, y); g.scale(1, ry / rx);
+        const d = g.createRadialGradient(0, -rx * .25, 0, 0, 0, rx); d.addColorStop(0, `rgba(232,238,252,${a})`); d.addColorStop(.6, `rgba(214,224,248,${a * .7})`); d.addColorStop(1, "rgba(214,224,248,0)");
+        g.fillStyle = d; g.beginPath(); g.arc(0, 0, rx, 0, TAU); g.fill(); g.restore();
+      };
+      g.lineCap = "round"; g.lineJoin = "round";
+      for (let i = 0; i < 22; i++) { // dry grass and seed heads poking through the snow, frosted at the tips
+        const x = Rf() * (W + 2 * M) - M, y = dfy(x) + 8 + Rf() * (H - dfy(x) - 4);
+        if (x > W * .38 && x < W * .74 && y < dfy(x) + 64) continue; // keep the heart in the snow clear
+        const n = 3 + (Rf() * 4 | 0), hh = (6 + Rf() * 7) * sc * (.7 + .5 * (y - H * .88) / (H * .12)), tips = [];
+        g.strokeStyle = `rgba(${78 + (Rf() * 30 | 0)},${66 + (Rf() * 18 | 0)},${58 + (Rf() * 14 | 0)},.62)`; g.lineWidth = .75;
         g.beginPath();
-        for (let k = 0; k < n; k++) { const a = rr(-.5, .5), bx = x + k * 1.2 - n * .6; g.moveTo(bx, y); g.quadraticCurveTo(bx + a * hh * .3, y - hh * .6, bx + a * hh, y - hh); }
+        for (let k = 0; k < n; k++) { const a = Rf() - .5, bx = x + k * 1.3 - n * .65, tx = bx + a * hh, ty = y - hh * (.75 + Rf() * .3); g.moveTo(bx, y); g.quadraticCurveTo(bx + a * hh * .25, y - hh * .6, tx, ty); tips.push([tx, ty]); }
         g.stroke();
+        for (const [tx, ty] of tips) { g.fillStyle = "rgba(236,242,255,.75)"; g.beginPath(); g.arc(tx, ty, .65, 0, TAU); g.fill(); }
+        if (Rf() < .35) { const [tx, ty] = tips[0]; g.fillStyle = "rgba(150,120,90,.7)"; g.beginPath(); g.ellipse(tx, ty - 1.2, .9, 2, Rf() - .5, 0, TAU); g.fill(); }
+        softDrift(x, y + .5, n * 1.1 + 2, 1.6, .32); // a little drift around the stems
       }
+      const snowRock = (x, y, r) => { // a granite boulder half buried in the snow, under a thick soft cap of snow
+        g.save(); g.translate(x + r * .9, y + r * .1); g.scale(1, .2);
+        const sh = g.createRadialGradient(0, 0, 0, 0, 0, r * 2.3); sh.addColorStop(0, "rgba(36,48,98,.36)"); sh.addColorStop(1, "rgba(36,48,98,0)");
+        g.fillStyle = sh; g.beginPath(); g.arc(0, 0, r * 2.3, 0, TAU); g.fill(); g.restore();
+        const N = 14, P = [];
+        for (let k = 0; k <= N; k++) { const a = Math.PI + k / N * Math.PI, q = .86 + Rf() * .24; P.push([x + Math.cos(a) * r * 1.35 * q, y + Math.sin(a) * r * .95 * q]); }
+        P[0][1] = P[N][1] = y + r * .15;
+        const curve = (A, i0, i1) => { g.moveTo(A[i0][0], A[i0][1]); for (let k = i0 + 1; k < i1; k++) g.quadraticCurveTo(A[k][0], A[k][1], (A[k][0] + A[k + 1][0]) / 2, (A[k][1] + A[k + 1][1]) / 2); g.lineTo(A[i1][0], A[i1][1]); };
+        g.beginPath(); curve(P, 0, N); g.closePath();
+        let gr2 = g.createLinearGradient(x - r, y - r, x + r * .9, y + r * .3); gr2.addColorStop(0, "#69728f"); gr2.addColorStop(.5, "#363d5a"); gr2.addColorStop(1, "#181c2e");
+        g.fillStyle = gr2; g.fill();
+        g.save(); g.clip();
+        for (let k = 0; k < 5; k++) { // cracks, and flecks of frost and lichen
+          let px = x + (Rf() - .5) * r * 2, py = y - Rf() * r * .8; g.strokeStyle = "rgba(8,10,22,.55)"; g.lineWidth = .45 + Rf() * .5; g.beginPath(); g.moveTo(px, py);
+          for (let m = 0; m < 3; m++) { px += (Rf() - .5) * r * .5; py += Rf() * r * .35; g.lineTo(px, py); }
+          g.stroke();
+        }
+        for (let k = 0; k < 16; k++) { g.fillStyle = Rf() < .55 ? "rgba(205,218,255,.25)" : "rgba(0,0,0,.2)"; g.fillRect(x + (Rf() - .5) * r * 2.5, y - Rf() * r, .8, .8); }
+        const ml = g.createRadialGradient(x - r * .9, y - r * .8, 0, x - r * .9, y - r * .8, r * 1.5); ml.addColorStop(0, "rgba(175,190,240,.32)"); ml.addColorStop(1, "rgba(175,190,240,0)");
+        g.fillStyle = ml; g.fillRect(x - r * 2, y - r * 2, r * 4, r * 2.3);
+        g.restore();
+        const kL = 2, kR = N - 2, top = [], bot = []; // the cap of snow: thick on top, draping down with a few drips
+        for (let k = kL; k <= kR; k++) {
+          const u = (k - kL) / (kR - kL), bell = Math.sin(u * Math.PI), [px, py] = P[k];
+          top.push([px + (px - x) * .06, py - r * (.08 + .3 * bell)]);
+          bot.push([px, py + r * (.06 + .34 * bell) * (k % 3 === 1 ? 1.35 : 1) + (Rf() - .5) * r * .08]);
+        }
+        const capPath = () => { g.beginPath(); curve(top, 0, top.length - 1); const B = bot.slice().reverse(); for (let k = 0; k < B.length; k++) g.lineTo(B[k][0], B[k][1]); g.closePath(); };
+        capPath();
+        const cg = g.createLinearGradient(x - r, y - r * 1.2, x + r * 1.1, y); cg.addColorStop(0, "#f6f9ff"); cg.addColorStop(.55, "#dde6fa"); cg.addColorStop(1, "#aebbe3");
+        g.fillStyle = cg; g.fill();
+        g.strokeStyle = "rgba(80,96,150,.45)"; g.lineWidth = .8; g.beginPath(); for (let k = 0; k < bot.length; k++) k ? g.lineTo(bot[k][0], bot[k][1] + .3) : g.moveTo(bot[k][0], bot[k][1] + .3); g.stroke();
+        g.strokeStyle = "rgba(255,255,255,.9)"; g.lineWidth = .9; g.beginPath(); curve(top, 0, Math.floor(top.length * .55)); g.stroke();
+        softDrift(x + r * .05, y + r * .2, r * 1.75, r * .34, .6); // snow piled round its foot
+      };
+      for (const [xn, yn, rr2] of [[.03, .937, 10], [.095, .958, 5], [.3, .993, 8], [.415, .999, 5], [.968, .95, 11], [.91, .967, 5.5]]) snowRock(xn * W, Math.max(dfy(xn * W) + 14, yn * H), rr2 * sc);
+      const berryBush = (x, y, s) => { // bare winterberry twigs, bright red berries and a little snow
+        const tips = [];
+        const branch = (bx, by, a, len, w, d) => {
+          const bend = (Rf() - .5) * .5, mx = bx + Math.cos(a + bend) * len * .5, my = by + Math.sin(a + bend) * len * .5, ex = bx + Math.cos(a) * len, ey = by + Math.sin(a) * len;
+          g.strokeStyle = "#3b2a25"; g.lineWidth = w; g.beginPath(); g.moveTo(bx, by); g.quadraticCurveTo(mx, my, ex, ey); g.stroke();
+          g.strokeStyle = "rgba(242,246,255,.8)"; g.lineWidth = w * .55; g.beginPath(); g.moveTo((bx + mx) / 2, (by + my) / 2 - w * .55); g.quadraticCurveTo(mx, my - w * .6, (mx + ex) / 2, (my + ey) / 2 - w * .5); g.stroke();
+          if (d > 0) { const n = 2 + (Rf() * 2 | 0); for (let i = 0; i < n; i++) { const u = .4 + Rf() * .5; branch(bx + (ex - bx) * u, by + (ey - by) * u, a + (Rf() - .5) * 1.2, len * (.42 + Rf() * .25), w * .62, d - 1); } }
+          else tips.push([ex, ey]);
+          if (d === 1) tips.push([bx + (ex - bx) * .72, by + (ey - by) * .72]);
+        };
+        for (let i = 0; i < 6; i++) branch(x + (Rf() - .5) * 7 * s, y, -Math.PI / 2 + (i - 2.5) * .27 + (Rf() - .5) * .2, (15 + Rf() * 10) * s, 1.5 * s, 2);
+        for (const [tx, ty] of tips) {
+          if (Rf() < .45) continue;
+          const n = 1 + (Rf() * 3 | 0);
+          for (let i = 0; i < n; i++) {
+            const bx = tx + (Rf() - .5) * 3.2 * s, by = ty + (Rf() - .5) * 3.2 * s, br = (1.05 + Rf() * .5) * s;
+            g.fillStyle = "#7d0c18"; g.beginPath(); g.arc(bx, by, br, 0, TAU); g.fill();
+            g.fillStyle = "#d42136"; g.beginPath(); g.arc(bx - br * .18, by - br * .18, br * .78, 0, TAU); g.fill();
+            g.fillStyle = "rgba(255,226,228,.9)"; g.beginPath(); g.arc(bx - br * .36, by - br * .4, br * .26, 0, TAU); g.fill();
+          }
+        }
+        softDrift(x, y, 14 * s, 4.5 * s, .75);
+      };
+      berryBush(W * .07, H + 1, 1.05 * sc); berryBush(W * .955, H + 3, .95 * sc);
     }
     const forest = [], fsc = Math.min(1.25, H / 800);
     for (let i = 0; i < 28; i++) {
@@ -1881,6 +1991,11 @@
     return { far0, far, near, field, front, fy, dfy, forest, cab, lanterns, pathLights, deer, sman, pengs };
   }
   const drawLayer = (L, off) => ctx.drawImage(L.c, -M, L.top + off, W + 2 * M, L.h);
+  function snowGlint(g, x, y, a) { // a crystal of snow catching the moonlight (they shimmer as you drag to look around)
+    glow("white", x, y, g.r * 2.2, a * .8);
+    const L = g.r * 1.8; ctx.globalAlpha = a * .8; ctx.fillStyle = g.c;
+    ctx.fillRect(x - L, y - .3, L * 2, .6); ctx.fillRect(x - .3, y - L, .6, L * 2);
+  }
 
   /* ================= Snowy fir boughs framing the top corners ================= */
   function boughGeo() { const bw = Math.min(W * .32, 230), y0 = Scene.topY - 4; return { bw, y0, P: [[-14, y0 + 4], [bw * .5, y0 + 42], [bw, y0 + 18]] }; }
@@ -2069,7 +2184,7 @@
       for (const d of T.dust) add("dust", d.x, d.y);
       this.P = P;
       this.orns = [[.07, 58, 11], [.17, 24, 8], [.83, 32, 9], [.93, 70, 12]].map(([x, len, s], i) => ({ xN: x, len, s, th: rand(-.15, .15), w: 0, ph: i * 1.7, x: null, y: null }));
-      this.glints = Array.from({ length: 18 }, () => ({ xN: rand(0, 1), front: Math.random() < .6, dy: rand(4, 60), p: rand(0, TAU), r: rand(1.2, 2.4), sp: rand(.4, 1.1) }));
+      this.glints = Array.from({ length: 44 }, (_, i) => ({ xN: rand(0, 1), front: Math.random() < .7, dy: rand(4, 92), p: rand(0, TAU), r: i < 9 ? rand(1.5, 2.3) : rand(.6, 1.3), sp: rand(.8, 2), c: i % 4 === 1 ? "#d2e6ff" : i % 4 === 3 ? "#fff0d8" : "#fff" }));
       const S = T.S;
       this.gifts = GIFTS.map((d, i) => ({ ...makeGift(d.w * S * .86, d.h * S * .86, d.d * S * .86, d.P, d.Rb, d.pat), x: G.cx + d.dx * G.mw, y: G.base + (4 + d.dy) * S, delay: i * .42, landed: false, hy: 0, hv: 0, note: [784, 880, 1047, 1175, 1319, 1568, 1760][i] }))
         .sort((a, b) => a.y - b.y);
@@ -2574,8 +2689,8 @@
         ctx.fillStyle = "#fff";
         for (const g of this.glints) {
           if (g.front) continue;
-          const gx = g.xN * W, gy = Wd.fy(gx) + fieldOff + g.dy * .35, a = Math.pow(Math.max(0, Math.sin(t * g.sp * 1.3 + g.p)), 10) * kfield;
-          if (a > .02) { glow("white", gx, gy, g.r * 2, a * .9); ctx.globalAlpha = a * .7; ctx.fillRect(gx - g.r * 1.6, gy - .35, g.r * 3.2, .7); ctx.fillRect(gx - .35, gy - g.r * 1.6, .7, g.r * 3.2); }
+          const gx = g.xN * W, gy = Wd.fy(gx) + fieldOff + g.dy * .3, a = Math.pow(Math.max(0, Math.sin(t * g.sp + g.p + cam.x * .08)), 14) * kfield;
+          if (a > .02) snowGlint(g, gx, gy, a);
         }
         ctx.globalCompositeOperation = "source-over";
       }
@@ -2791,8 +2906,8 @@
           if (!g.front) continue;
           const gx = g.xN * W, gy = Wd.dfy(gx) + frOff + g.dy;
           if (gy > H + 10) continue;
-          const a = Math.pow(Math.max(0, Math.sin(t * g.sp * 1.3 + g.p)), 10) * kfr;
-          if (a > .02) { glow("white", gx, gy, g.r * 2, a * .9); ctx.globalAlpha = a * .7; ctx.fillRect(gx - g.r * 1.6, gy - .35, g.r * 3.2, .7); ctx.fillRect(gx - .35, gy - g.r * 1.6, .7, g.r * 3.2); }
+          const a = Math.pow(Math.max(0, Math.sin(t * g.sp + g.p + cam.x * .1)), 14) * kfr;
+          if (a > .02) snowGlint(g, gx, gy, a);
         }
         ctx.globalCompositeOperation = "source-over";
       }
