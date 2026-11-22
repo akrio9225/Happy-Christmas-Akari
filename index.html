@@ -662,6 +662,13 @@
     const env = h => mw * Math.pow(clamp(h), .9) * (1 + .045 * Math.sin(h * 27 + 1));
     const yAt = h => oy + h * th * HF;
     const tw = Math.max(4, mw * .075);
+    { // deep shade under the lowest branches, fading softly out to the snow (no hard edge beside the trunk)
+      const yb = yAt(1) + env(1) * .14, rx = env(1) * .9, ry = oy + th - yb + 8;
+      g.save(); g.translate(ox, yb - 5); g.scale(1, ry / rx);
+      const ug = g.createRadialGradient(0, 0, 0, 0, 0, rx);
+      ug.addColorStop(0, "rgba(7,22,15,.97)"); ug.addColorStop(.5, "rgba(8,20,17,.88)"); ug.addColorStop(.8, "rgba(10,18,26,.42)"); ug.addColorStop(1, "rgba(12,18,30,0)");
+      g.fillStyle = ug; g.beginPath(); g.arc(0, 0, rx, 0, Math.PI); g.fill(); g.restore();
+    }
     let gr = g.createLinearGradient(ox - tw * .6, 0, ox + tw * .6, 0);
     gr.addColorStop(0, "#120c07"); gr.addColorStop(.45, "#463224"); gr.addColorStop(1, "#100a06");
     g.fillStyle = gr;
@@ -2315,11 +2322,26 @@
     }
     return roots;
   }
+  // what Santa says when she taps him: first something about the date, then a few friendly lines in turn
+  const SANTA_LINES = [["Ho ho ho!", "Merry Christmas, Akari!"], ["Someone loves you", "very, very much!"], ["Did you make a wish?", "Hold your finger on the sky!"],
+    ["My reindeer say", "hello, Akari!"], ["Tap the penguins —", "they're in love!"], ["Stay warm and cosy,", "Akari! Ho ho ho!"]];
+  function santaDateLine() {
+    const d = new Date(), today = new Date(d.getFullYear(), d.getMonth(), d.getDate()), m = d.getMonth(), day = d.getDate();
+    const left = Math.round((new Date(d.getFullYear(), 11, 25) - today) / 864e5);
+    if (left > 1 && left <= 60) return [`Only ${left} more days`, "until Christmas, Akari!"];
+    if (left === 1) return ["It's Christmas Eve!", "I'm on my way, Akari!"];
+    if (left === 0) return ["It's Christmas Day!", "Merry Christmas, Akari!"];
+    if (m === 11) return ["I hope your Christmas", "was magical, Akari!"];
+    if (m === 0 && day === 1) return ["Happy New Year,", "Akari! Ho ho ho!"];
+    return ["Ho ho ho!", "Merry Christmas, Akari!"];
+  }
+  // and little lines tucked inside the presents under the tree
+  const GIFT_NOTES = ["you're my favourite gift", "I'm so lucky it's you", "my heart is all yours", "you make everything brighter", "my favourite place is next to you"];
   // little love notes hidden in the glass-heart ornaments on the tree
   const NOTES = ["you are my favourite person", "every day with you is a gift", "my heart is yours", "you make winter feel warm", "forever and always, you", "thank you for being you"];
 
   const Scene = {
-    t: 0, running: false, begun: false, tree: null, world: null, mask: null, P: [], fired: {}, orns: [], glints: [], gifts: [], smoke: [],
+    t: 0, running: false, begun: false, tree: null, world: null, mask: null, P: [], fired: {}, orns: [], glints: [], gifts: [], smoke: [], floaters: [], notes: [],
     skew: 0, shake: 0, shakeV: 0, starBoost: 0, moonBoost: 0, ring: null, nextGlint: 0, glintT: -9, textRects: null, topY: 0, moonPos: null,
     sparkleT: 0, wishT: 0, crystT: 0, fly: null, nextFly: 0, smWave: 0, smHat: 0, smHatV: 0, gust: null, nextGust: 0, cloudX: 0,
     geo() { const apex = H * .405, base = H * .845, th = base - apex; return { cx: W / 2, apex, base, th, mw: Math.min(W * .36, th * .36) }; },
@@ -2388,7 +2410,7 @@
       this.shake = this.shakeV = 0; this.fly = null; this.nextFly = Infinity; this.crystT = 9; this.nextGust = T_DONE + 7;
       this.sc = { gift: "held", tGive: -1, tOpen: -1, tClose: -1, waveT: 0, lower: 0, low: 0, bub: null, talk: 0, blink: 0, rect: null, gpos: null, breath: [], nextBreath: 0, laughT: 0, twT: 0 };
       this.hearts = []; fw = []; fwRockets = []; fwFlash = []; fwText = [];
-      this.notes = []; this.noteI = 0; this.bloomT = 0; this.roots = null; this.showT = 0; this.nextShow = T_DONE + 8; this.rb = null; this.owl = null; this.tsmoke = []; this.trainPos = null; this.trainPuff = 0; this.pg = { next: T_SNOWMAN + 17, kiss: -9, kh: true, hop: -9, hearts: [] };
+      this.notes = []; this.floaters = []; this.giftN = 0; this.noteI = 0; this.bloomT = 0; this.roots = null; this.showT = 0; this.nextShow = T_DONE + 8; this.rb = null; this.owl = null; this.hiN = 0; this.tsmoke = []; this.trainPos = null; this.trainPuff = 0; this.pg = { next: T_SNOWMAN + 17, kiss: -9, kh: true, hop: -9, hearts: [] };
       document.body.classList.remove("p-text");
       hideHint(); hideCard(); hintEl.classList.remove("side");
     },
@@ -3306,6 +3328,19 @@
           if (Math.abs(spin) > .97) { ctx.globalCompositeOperation = "lighter"; glow("white", ex - o.s * .25, cy - o.s * .3, o.s * .9, (Math.abs(spin) - .97) * 20 * okn); ctx.globalCompositeOperation = "source-over"; }
         }
       }
+      if (this.floaters.length) { // hearts and music notes floating up out of a present
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        for (let i = this.floaters.length - 1; i >= 0; i--) {
+          const f = this.floaters[i], a = t - f.t0, u = a / 2.3;
+          if (u >= 1) { this.floaters.splice(i, 1); continue; }
+          if (a < 0) continue;
+          const x = f.x + f.vx * a + Math.sin(a * 4 + f.ph) * 5, y = f.y + f.vy * a + 9 * a * a;
+          ctx.globalAlpha = Math.min(1, u * 8) * Math.min(1, (1 - u) * 2.5); ctx.fillStyle = f.c;
+          if (f.k === "heart") { heartPath(ctx, x, y, f.s * (.7 + .3 * Math.min(1, u * 5))); ctx.fill(); }
+          else { ctx.font = `600 ${f.s}px Georgia, serif`; ctx.shadowColor = "rgba(255,200,120,.8)"; ctx.shadowBlur = 8; ctx.fillText(f.g, x, y); ctx.shadowBlur = 0; }
+        }
+        ctx.shadowColor = "transparent"; ctx.globalAlpha = 1;
+      }
       if (this.notes.length) { // a love note floats up from a glass heart
         ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
         const fs = clamp(W * .048, 17, 23);
@@ -3348,11 +3383,21 @@
       b.lines.forEach((l, i) => ctx.fillText(l, bx0 + bw / 2, by1 - bh + pad * .65 + lh * (i + .5)));
       ctx.restore();
     },
+    giftSurprise(gf, t) { // every present under the tree holds a little surprise, a different one each time
+      const k = (this.giftN = (this.giftN || 0) + 1) % 6, [sx, sy] = screenOf(gf.x, gf.y - gf.bh, 1), F = this.floaters;
+      if (k === 1) for (let i = 0; i < 8; i++) F.push({ k: "heart", x: sx + rand(-8, 8), y: sy, vx: rand(-26, 26), vy: rand(-78, -48), t0: t + i * .06, s: rand(7, 12), c: ["#ff4d6d", "#ff8fa3", "#e8294c"][i % 3], ph: rand(0, TAU) });
+      else if (k === 2) { const [x1, y1] = wishSpot(sx, sy - 70); rising.push({ x0: sx, y0: sy, x1, y1, t0: GT, c: .8 }); chime(.04); } // a star for her own sky
+      else if (k === 3) { for (let i = 0; i < 6; i++) F.push({ k: "note", x: sx + rand(-10, 10), y: sy, vx: rand(-30, 30), vy: rand(-62, -40), t0: t + i * .1, s: rand(13, 18), c: ["#ffe08a", "#fff4d6", "#ffd0dc"][i % 3], ph: rand(0, TAU), g: i % 2 ? "\u266A" : "\u266B" }); arpeggio([1047, 1319, 1568, 2093, 2637], .11, .03); }
+      else if (k === 4) { this.notes.push({ text: GIFT_NOTES[(this.giftNote = (this.giftNote || 0) + 1) % GIFT_NOTES.length], x: sx, y: sy - 26, t0: t }); chime(.035); }
+      else if (k === 5) { const [wx, wy] = toWorld(sx, sy, 1); for (let i = 0; i < 30; i++) { const a = rand(-Math.PI * .95, -Math.PI * .05), v = rand(80, 190); sparks.push({ x: wx, y: wy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, dec: rand(.55, .9), size: rand(2.2, 3.8), c: ["lred", "gold", "lgreen", "lblue", "pink", "white"][i % 6], g: 170 }); } if (sfx) noise(actx.currentTime, .25, 2600, .05, "highpass"); }
+      else { snowPuff(gf.x, gf.y - gf.bh, 16, 1); for (let i = 0; i < 2; i++) spawnCrystal(false); }
+    },
     santaHi(t) {
       const sc = this.sc;
       if (sc.bub || t < SC_GIVE + SC_FLY) return false;
       sc.lower = 0; sc.waveT = t + 4; sc.relower = sc.tClose > 0 ? t + 5 : 0;
-      this.say(["Ho ho ho!", "Merry Christmas, Akari!"], 3.8); jingle(1.6, .6);
+      const n = this.hiN = (this.hiN || 0) + 1, lines = n === 1 ? santaDateLine() : SANTA_LINES[(n - 2) % SANTA_LINES.length];
+      this.say(lines, 3.8); jingle(1.6, .6);
       return true;
     },
     tapGift(t) { // a little shake of anticipation, then it opens
@@ -3381,6 +3426,7 @@
       setTimeout(() => this.running && showHint("tap the little glass hearts on the tree ♥", 6500), 37000);
       setTimeout(() => this.running && showHint("drag to look around · tap Santa to say hi", 7000), 45000);
       setTimeout(() => this.running && showHint("say hello to the penguins", 6500), 53000);
+      setTimeout(() => this.running && showHint("every present under the tree has a surprise ✦", 6500), 61000);
     },
     drawSantaClose(t, dt) {
       const sc = this.sc, u = t - T_SC, s = Math.min(W / 402, H / 874) * .8;
@@ -3562,7 +3608,7 @@
       if (this.trainPos && Math.hypot(x - this.trainPos[0], y - this.trainPos[1]) < 26 * this.tree.S) { toot(); this.trainPuff = 8; return; }
       for (const gf of this.gifts) {
         if (!gf.landed) continue;
-        if (Math.abs(x - gf.x) < gf.bw * .6 + 6 && y < gf.y + 8 && y > gf.y - gf.bh - 16) { gf.hv = -260; burst(gf.x, gf.y - gf.bh, 14, "gold"); ping(gf.note); return; }
+        if (Math.abs(x - gf.x) < gf.bw * .6 + 6 && y < gf.y + 8 && y > gf.y - gf.bh - 16) { gf.hv = -260; burst(gf.x, gf.y - gf.bh, 14, "gold"); ping(gf.note); if (t > T_DONE) this.giftSurprise(gf, t); return; }
       }
       const Sm = this.world.sman, [smx, smy] = toWorld(sx0, sy0, 1.25);
       if (this.owl && t > T_PATHL + 4.2 && t < T_SC - .3) { // tap the owl: hoo, hoo-hoo
