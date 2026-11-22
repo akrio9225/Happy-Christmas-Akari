@@ -416,15 +416,93 @@
     ctx.globalAlpha = 1; ctx.drawImage(skyCv, 0, 0, W, H);
     ctx.fillStyle = "#fff";
     for (const s of twinkles) { const a = Math.sin(s.p + t * s.s); if (a > 0) { ctx.globalAlpha = a * .6; ctx.fillRect(s.x, s.y, s.r, s.r); } }
+    if (Scene.running) drawWishStars(t);
     if (Math.random() < .0004) shooters.push({ x: rand(0, W * .6), y: rand(0, H * .3), vx: 560, vy: 250, life: 1 });
     ctx.lineCap = "round";
     for (let i = shooters.length - 1; i >= 0; i--) {
       const s = shooters[i]; s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt * 1.2;
       if (s.life <= 0) { shooters.splice(i, 1); continue; }
-      const L = .2, g = ctx.createLinearGradient(s.x, s.y, s.x - s.vx * L, s.y - s.vy * L);
+      const L = .2, g = ctx.createLinearGradient(s.x, s.y, s.x - s.vx * L, s.y - s.vy * L); // (shooting star)
       g.addColorStop(0, `rgba(255,255,255,${s.life})`); g.addColorStop(1, "rgba(255,255,255,0)");
       ctx.globalAlpha = 1; ctx.strokeStyle = g; ctx.lineWidth = 1.6;
       ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.vx * L, s.y - s.vy * L); ctx.stroke();
+    }
+  }
+  /* Wishes: hold a finger on the night sky; let go, and the light rises to become a new star that stays (remembered on her phone) */
+  const WKEY = "akari-wish-stars-v1";
+  let wishStars = (() => { try { const a = JSON.parse(localStorage.getItem(WKEY) || "[]"); return Array.isArray(a) ? a.filter(s => Array.isArray(s) && isFinite(s[0]) && isFinite(s[1])).slice(-40).map(([x, y]) => ({ x, y, t: -99 })) : []; } catch (_) { return []; } })();
+  let rising = [], wishHinted = false;
+  function saveWishes() { try { localStorage.setItem(WKEY, JSON.stringify(wishStars.slice(-40).map(s => [+s.x.toFixed(4), +s.y.toFixed(4)]))); } catch (_) {} }
+  let wishEdges = [], wishN = -1;
+  function wishTree() { // join her stars into a constellation: each one to its nearest neighbour already joined (a minimum spanning tree)
+    wishN = wishStars.length; wishEdges = [];
+    if (wishN < 2) return;
+    const inT = [0], d = wishStars.map(s => Math.hypot((s.x - wishStars[0].x) * W, (s.y - wishStars[0].y) * H)), from = wishStars.map(() => 0);
+    const used = new Uint8Array(wishN); used[0] = 1;
+    for (let k = 1; k < wishN; k++) {
+      let bi = -1; for (let i = 0; i < wishN; i++) if (!used[i] && (bi < 0 || d[i] < d[bi])) bi = i;
+      used[bi] = 1; wishEdges.push([from[bi], bi]);
+      for (let i = 0; i < wishN; i++) if (!used[i]) { const dd = Math.hypot((wishStars[i].x - wishStars[bi].x) * W, (wishStars[i].y - wishStars[bi].y) * H); if (dd < d[i]) { d[i] = dd; from[i] = bi; } }
+    }
+  }
+  function drawWishStars(t) { // her own stars, warm gold among the others, joined into her own constellation
+    if (!wishStars.length) return;
+    if (wishN !== wishStars.length) wishTree();
+    ctx.lineCap = "round"; ctx.strokeStyle = "rgb(255,222,165)"; ctx.lineWidth = .7;
+    for (const [i, j] of wishEdges) {
+      const A = wishStars[i], B = wishStars[j], grow = clamp((GT - Math.max(A.t, B.t) - .9) / 1.2), f = ease(grow);
+      if (f <= 0) continue;
+      const ax = A.x * W, ay = A.y * H, bx = B.x * W, by = B.y * H, [sx, sy, ex, ey] = A.t > B.t ? [ax, ay, bx, by] : [bx, by, ax, ay];
+      ctx.globalAlpha = .16 + .04 * Math.sin(t * .9 + i); ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + (ex - sx) * f, sy + (ey - sy) * f); ctx.stroke();
+    }
+    ctx.globalCompositeOperation = "lighter";
+    wishStars.forEach((s, i) => {
+      const x = s.x * W, y = s.y * H, age = GT - s.t, pop = age < 1.6 ? 1 + 2.4 * Math.pow(1 - age / 1.6, 2) : 1, tw = .8 + .2 * Math.sin(t * 1.6 + i * 2.3);
+      glow("gold", x, y, 13 * pop, .17 * tw * Math.min(pop, 1.6)); glow("cream", x, y, 4.2 * pop, .55 * tw); glow("white", x, y, 2.3 * pop, .95 * tw);
+      const L = (5.5 + .8 * Math.sin(t * 1.1 + i)) * pop; ctx.globalAlpha = .6 * tw; ctx.fillStyle = "#ffe9c2";
+      ctx.fillRect(x - L, y - .4, L * 2, .8); ctx.fillRect(x - .4, y - L, .8, L * 2);
+    });
+    ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+  }
+  function wishOk(sx, sy) { return Scene.running && Scene.t > T_DONE + 1 && sy > H * .25 && sy < H * .6 && !Scene.hitTree(...toWorld(sx, sy, 1)); }
+  function wishSpot(x0, y0) { // where a wish settles: higher up in open sky, clear of the title, the tree and the moon
+    const G = Scene.geo(); let y = clamp(y0 - rand(80, 130), H * .26, H * .55), x = clamp(x0 + rand(-22, 22), 16, W - 16);
+    if (y > G.apex - 34) { const hw = G.mw * Math.pow(clamp((y - G.apex) / (G.base - G.apex)), .9) * 1.05 + 22; if (Math.abs(x - G.cx) < hw) x = clamp(G.cx + (x < G.cx ? -1 : 1) * hw, 14, W - 14); }
+    const mp = Scene.moonPos; if (mp && Math.hypot(x - mp[0], y - mp[1]) < mp[2] + 24) y = mp[1] - mp[2] - 30;
+    return [x, y];
+  }
+  function drawWish(dt) { // the light gathering under her finger, and wishes rising into the sky
+    if (ptr && ptr.wish) {
+      const held = (performance.now() - ptr.t) / 1000;
+      if (held > .45) {
+        const c = clamp((held - .45) / 1.1), x = ptr.sx, y = ptr.sy - 6;
+        if (!ptr.charging) { ptr.charging = true; if (sfx) sweep(actx.currentTime, 1.3, 520, 1560, .016); }
+        if (c >= 1 && !ptr.full) { ptr.full = true; chime(.035); }
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.globalCompositeOperation = "lighter";
+        glow("cream", x, y, 16 + 30 * c, .14 + .3 * c); glow("white", x, y, 2.5 + 4.5 * c, .65 + .35 * c);
+        if (ptr.full) glow("gold", x, y, 30 + 6 * Math.sin(GT * 6), .12);
+        ctx.globalCompositeOperation = "source-over";
+        if (Math.random() < .35 + c * .6) { // motes of light drawn in from all around
+          const a = rand(0, TAU), r = rand(24, 46), [wx, wy] = toWorld(x + Math.cos(a) * r, y + Math.sin(a) * r, 1);
+          sparks.push({ x: wx, y: wy, vx: -Math.cos(a) * r * 2.3, vy: -Math.sin(a) * r * 2.3, life: .42, dec: 2.4, size: rand(1.6, 2.8), c: "champ", g: 0 });
+        }
+      }
+    }
+    if (!rising.length) return;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    for (let i = rising.length - 1; i >= 0; i--) {
+      const w = rising[i], f = clamp((GT - w.t0) / 1.7), e = 1 - Math.pow(1 - f, 3);
+      const x = w.x0 + (w.x1 - w.x0) * e + Math.sin(f * Math.PI * 2) * 7 * (1 - f), y = w.y0 + (w.y1 - w.y0) * e;
+      ctx.globalCompositeOperation = "lighter"; glow("cream", x, y, 14 + 10 * w.c, .3); glow("white", x, y, 3.4, 1); ctx.globalCompositeOperation = "source-over";
+      if (Math.random() < .8) { const [wx, wy] = toWorld(x, y, 1); sparks.push({ x: wx, y: wy, vx: rand(-12, 12), vy: rand(8, 30), life: 1, dec: rand(1.1, 1.7), size: rand(1.8, 3.2), c: Math.random() < .5 ? "champ" : "white", g: 10 }); }
+      if (f >= 1) {
+        rising.splice(i, 1);
+        const [sx, sy] = toWorld(w.x1, w.y1, .06); wishStars.push({ x: sx / W, y: sy / H, t: GT }); if (wishStars.length > 40) wishStars.shift(); saveWishes();
+        const [bx, by] = toWorld(w.x1, w.y1, 1); burst(bx, by, 16, "gold");
+        if (sfx) { const a = actx.currentTime; [1568, 2093, 2637, 3136].forEach((fq, j) => bell(fq, a + j * .09, .7, .03, sfx)); }
+        if (!wishHinted) { wishHinted = true; showHint(wishStars.length > 1 ? "your wishes are making your own constellation ✦" : "your wish is a star now ✦ it will stay in your sky", 5200); }
+        else if (wishStars.length === 2) showHint("your wishes are making your own constellation ✦", 5200);
+      }
     }
   }
   function shoot(sx, sy) { const [x, y] = toWorld(sx, sy, .06), d = Math.random() < .5 ? 1 : -1; shooters.push({ x, y, vx: d * rand(480, 640), vy: rand(160, 300), life: 1 }); }
@@ -2141,11 +2219,13 @@
   }
 
   /* ================= The scene ================= */
-  const T_FORM = .4, FLY = 2.4, T_TOPSTAR = 2.8,
+  // first the stars gather and write her name across the sky; then they fly on into the shape of a tree
+  const NAME0 = .5, NAME_FLY = 1.9, NAME_D = 4.9,
+        T_FORM = .4 + NAME_D, FLY = 2.4, T_TOPSTAR = 2.8 + NAME_D,
         // while the tree is still only stars, the land comes out of the dark
-        T_FAR0 = 4.8, T_FAR = 5.6, T_MOON = 6.2, T_NEAR = 6.4, T_FOG = 7, T_LAKE = 7.4, T_FIELD = 8,
+        T_FAR0 = 4.8 + NAME_D, T_FAR = 5.6 + NAME_D, T_MOON = 6.2 + NAME_D, T_NEAR = 6.4 + NAME_D, T_FOG = 7 + NAME_D, T_LAKE = 7.4 + NAME_D, T_FIELD = 8 + NAME_D,
         // then the top star lets one seed fall; it lands, sprouts and grows into the tree
-        T_SEED = 10.8, SEED_D = 1.7, T_LAND = T_SEED + SEED_D, T_SPROUT = T_LAND + .6, SPROUT_D = 1.7,
+        T_SEED = 10.8 + NAME_D, SEED_D = 1.7, T_LAND = T_SEED + SEED_D, T_SPROUT = T_LAND + .6, SPROUT_D = 1.7,
         T_GROW = T_SPROUT + SPROUT_D - .3, D_GROW = 6.2, GROW_N = 4, T_TREE = T_GROW + D_GROW,
         T_BAUBLE = T_TREE + .1, T_COMET = T_TREE + 1.5, COMET_D = 2.6, T_STAR = T_COMET + COMET_D,
         T_SNOW = T_STAR + 1, T_CLOUD = T_SNOW + 1.2, T_FOREST = T_SNOW + 1.6, T_CABIN = T_SNOW + 2.8, T_FRONT = T_SNOW + 4,
@@ -2184,6 +2264,27 @@
     skew: 0, shake: 0, shakeV: 0, starBoost: 0, moonBoost: 0, ring: null, nextGlint: 0, glintT: -9, textRects: null, topY: 0, moonPos: null,
     sparkleT: 0, wishT: 0, crystT: 0, fly: null, nextFly: 0, smWave: 0, smHat: 0, smHatV: 0, gust: null, nextGust: 0, cloudX: 0,
     geo() { const apex = H * .405, base = H * .845, th = base - apex; return { cx: W / 2, apex, base, th, mw: Math.min(W * .36, th * .36) }; },
+    nameTargets() { // "Akari", written in stars: sample her name and give every star of the tree-to-be a place in it
+      const P = this.P, fontOk = !document.fonts || document.fonts.check('60px "Great Vibes"'), face = fontOk ? '"Great Vibes", cursive' : 'italic 500 "Cormorant Garamond", serif';
+      const m0 = mk(8, 8).getContext("2d"); m0.font = fontOk ? `100px ${face}` : `italic 500 100px "Cormorant Garamond", serif`;
+      const wT = Math.min(W * .8, 430), fs = 100 * wT / m0.measureText("Akari").width, cw = Math.ceil(wT * 1.25), ch = Math.ceil(fs * 1.5);
+      const c = mk(cw, ch), g = c.getContext("2d");
+      g.font = fontOk ? `${fs}px ${face}` : `italic 500 ${fs}px "Cormorant Garamond", serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#fff";
+      g.fillText("Akari", cw / 2, ch / 2);
+      const d = g.getImageData(0, 0, cw, ch).data, pts = [], st = 2;
+      for (let x = 0; x < cw; x += st) for (let y = 0; y < ch; y += st) if (d[(y * cw + x) * 4 + 3] > 140) pts.push([x - cw / 2, y - ch / 2]);
+      if (pts.length < 20) return;
+      const gc = mk(Math.ceil(cw * DPR), Math.ceil(ch * DPR)), gg = gc.getContext("2d"); // a faint golden glow of her name, behind the stars
+      gg.setTransform(DPR, 0, 0, DPR, 0, 0); gg.font = g.font; gg.textAlign = "center"; gg.textBaseline = "middle";
+      gg.shadowColor = "rgba(255,214,150,.9)"; gg.shadowBlur = 14 * DPR; gg.fillStyle = "rgba(255,236,200,.55)"; gg.fillText("Akari", cw / 2, ch / 2);
+      this.nameGlow = { c: gc, x: W / 2 - cw / 2, y: H * .36 - ch / 2, w: cw, h: ch };
+      const x0 = pts[0][0], x1 = pts[pts.length - 1][0], ny = H * .36, order = P.map((_, i) => i).sort((a, b) => P[a].tx - P[b].tx);
+      order.forEach((pi, r) => {
+        const q = pts[Math.min(pts.length - 1, Math.floor((r + .5) * pts.length / P.length))], p = P[pi];
+        p.nx = W / 2 + q[0] + rand(-.6, .6); p.ny = ny + q[1] + rand(-.6, .6); p.nu = (q[0] - x0) / Math.max(1, x1 - x0);
+        p.d1 = p.nu * .85 + rand(0, .3); // the stars arrive from left to right, as if her name were being written
+      });
+    },
     build() {
       const G = this.geo();
       this.tree = buildTree(G.mw, G.th);
@@ -2876,13 +2977,37 @@
       }
       if (t > this.nextShow) { this.showT = t; this.nextShow = t + rand(22, 30); arpeggio([2093, 1760, 1568, 1319, 1047], .14, .018); } // a sparkle runs down the tree
       this.drawConstellation(t, cx, apex, S);
+      if (t > NAME0 - .4 && t < T_FORM + 1 && this.P.length && this.P[0].nx == null) this.nameTargets();
+      this.once("name0", NAME0, () => { if (sfx) sweep(actx.currentTime, 2.2, 260, 1300, .018); });
+      this.once("name1", NAME0 + NAME_FLY + .75, () => arpeggio([784, 988, 1175, 1568, 1976], .17, .032));
+      const nmA = clamp((t - NAME0 - NAME_FLY - .75) / 1.2); // when her name is complete, a shimmer runs along it
+      if (this.nameGlow && t < T_FORM + 1.6) {
+        const NG = this.nameGlow, ga = ease(clamp((t - NAME0 - NAME_FLY * .7) / 1.3)) * (1 - ease(clamp((t - T_FORM) / 1.4))) * (.2 + .04 * Math.sin(t * 2.4));
+        if (ga > .005) { ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = ga; ctx.drawImage(NG.c, NG.x, NG.y, NG.w, NG.h); ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1; }
+      }
       for (const p of this.P) {
         const k = ease(clamp((t - T_FORM - p.delay) / FLY));
         if (k >= 1 && p.kind === "light") continue;
-        const tx = cx + p.tx, ty = apex + p.ty;
+        const tx = cx + p.tx, ty = apex + p.ty, named = p.nx != null;
         if (k < 1) {
-          const sx = p.sxN * W, sy = p.syN * H;
-          if (k <= 0) { glow("white", sx, sy, 1.6, .28 + .45 * Math.abs(Math.sin(t * p.ts + p.tw))); continue; }
+          const sx = named ? p.nx : p.sxN * W, sy = named ? p.ny : p.syN * H;
+          if (k <= 0) {
+            const tw = Math.abs(Math.sin(t * p.ts + p.tw));
+            if (!named) { glow("white", sx, sy, 1.6, .28 + .45 * tw); continue; }
+            const k1 = ease(clamp((t - NAME0 - p.d1) / NAME_FLY)), ax = p.sxN * W, ay = p.syN * H;
+            if (k1 <= 0) { glow("white", ax, ay, 1.6, .28 + .45 * tw); continue; }
+            if (k1 < 1) { // flying into her name
+              const dx = sx - ax, dy = sy - ay, len = Math.hypot(dx, dy) || 1, bd = Math.sin(k1 * Math.PI) * p.curve * .6;
+              glow("white", ax + dx * k1 - dy / len * bd, ay + dy * k1 + dx / len * bd, 2.2, .9);
+              const k2 = ease(clamp((t - .06 - NAME0 - p.d1) / NAME_FLY)), b2 = Math.sin(k2 * Math.PI) * p.curve * .6;
+              glow("white", ax + dx * k2 - dy / len * b2, ay + dy * k2 + dx / len * b2, 1.5, .38);
+              continue;
+            }
+            const sh = nmA > 0 && nmA < 1 ? Math.exp(-Math.pow((p.nu - nmA * 1.3 + .15) / .09, 2)) : 0;
+            glow("cream", sx, sy, 5.5 + 5 * sh, .09 + .28 * sh);
+            glow("white", sx, sy, 1.7 + .9 * sh, .5 + .35 * tw + .35 * sh);
+            continue;
+          }
           const dx = tx - sx, dy = ty - sy, len = Math.hypot(dx, dy) || 1, bd = Math.sin(k * Math.PI) * p.curve;
           glow("white", sx + dx * k - dy / len * bd, sy + dy * k + dx / len * bd, 2.3, .95);
           const k2 = ease(clamp((t - .06 - T_FORM - p.delay) / FLY)), b2 = Math.sin(k2 * Math.PI) * p.curve;
@@ -3190,9 +3315,10 @@
       hideCard(); sc.tClose = this.t; sc.relower = this.t + 2.4;
       sc.fwShow = this.t + 2; sc.nextFw = this.t + 30; sc.nextWave = this.t + 22; // then: New Year fireworks
       setTimeout(() => this.running && showHint("tap the sky for fireworks ✦", 6500), 20500);
-      setTimeout(() => this.running && showHint("tap the little glass hearts on the tree ♥", 6500), 28500);
-      setTimeout(() => this.running && showHint("drag to look around · tap Santa to say hi", 7000), 36500);
-      setTimeout(() => this.running && showHint("say hello to the penguins", 6500), 44500);
+      setTimeout(() => this.running && showHint("hold your finger on the sky to make a wish ✦", 7000), 28500);
+      setTimeout(() => this.running && showHint("tap the little glass hearts on the tree ♥", 6500), 37000);
+      setTimeout(() => this.running && showHint("drag to look around · tap Santa to say hi", 7000), 45000);
+      setTimeout(() => this.running && showHint("say hello to the penguins", 6500), 53000);
     },
     drawSantaClose(t, dt) {
       const sc = this.sc, u = t - T_SC, s = Math.min(W / 402, H / 874) * .8;
@@ -3439,16 +3565,23 @@
   let ptr = null;
   addEventListener("pointerdown", e => {
     if (e.target.closest(".begin, .gcard")) return;
-    ptr = { sx: e.clientX, sy: e.clientY, t: performance.now(), id: e.pointerId };
+    ptr = { sx: e.clientX, sy: e.clientY, t: performance.now(), id: e.pointerId, wish: wishOk(e.clientX, e.clientY) };
   });
   addEventListener("pointermove", e => {
     if (!ptr || e.pointerId !== ptr.id) return;
+    if (ptr.wish && Math.hypot(e.clientX - ptr.sx, e.clientY - ptr.sy) > 14) ptr.wish = false; // a drag, not a wish
+    if (ptr.wish && ptr.charging) return; // keep the view still while she makes a wish
     if (Scene.running) { cam.tx = -clamp((e.clientX - W / 2) / W, -.5, .5) * 24; cam.ty = -clamp((e.clientY - H / 2) / H, -.5, .5) * 14; }
     Scene.move(e.clientX, e.clientY);
   });
   const endPtr = e => {
     if (!ptr || e.pointerId !== ptr.id) return;
     if (Math.hypot(e.clientX - ptr.sx, e.clientY - ptr.sy) < 10 && performance.now() - ptr.t < 450) Scene.tap(e.clientX, e.clientY);
+    else if (ptr.wish && ptr.charging && e.type === "pointerup") { // let go: the wish rises and becomes a star
+      const c = clamp((performance.now() - ptr.t - 450) / 1100), x0 = ptr.sx, y0 = ptr.sy - 6;
+      const [x1, y1] = wishSpot(x0, y0); rising.push({ x0, y0, x1, y1, t0: GT, c });
+      if (sfx) noise(actx.currentTime, .9, 3200, .035, "highpass");
+    }
     ptr = null; cam.tx = cam.ty = 0;
   };
   addEventListener("pointerup", endPtr);
@@ -3769,6 +3902,7 @@
     const pre = Scene.running ? 1 - clamp(Scene.t / 1.6) : 1;
     if (pre > 0) { ctx.save(); drawSnow(dt, .3 * pre); ctx.restore(); }
     drawSparks(dt);
+    drawWish(dt);
     drawBokeh(dt);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.globalAlpha = 1; ctx.drawImage(vigCv, 0, 0, W, H);
